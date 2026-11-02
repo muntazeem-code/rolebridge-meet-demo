@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { api, getApiError } from "../services/api";
-import { meetingTime, type Meeting, type MeetingPage } from "../types/meeting";
+import { meetingTime, meetingPhase, type Meeting, type MeetingPage, type MeetingView } from "../types/meeting";
 
 const statuses = {
   creating: "Creating",
@@ -17,12 +17,15 @@ const emailStatuses = {
 export default function MeetingList({
   admin = false,
   refreshKey = 0,
+  scope = "vp",
 }: {
   admin?: boolean;
   refreshKey?: number;
+  scope?: "vp" | "customer" | "panelist" | "reviewer";
 }) {
   const [result, setResult] = useState<MeetingPage | null>(null);
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<MeetingView>(admin ? "all" : "upcoming");
   const [reload, setReload] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,20 +33,24 @@ export default function MeetingList({
   const [retrying, setRetrying] = useState("");
   const [checkedAt, setCheckedAt] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setCheckedAt(Date.now()), 60000);
+    const timer = setInterval(() => {
+      setCheckedAt(Date.now());
+      setReload((value) => value + 1);
+    }, 60000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
     let active = true;
     api
-      .get<MeetingPage>(admin ? "/admin/meetings" : "/meetings", {
-        params: { page },
+      .get<MeetingPage>(admin ? "/admin/meetings" : scope === "vp" ? "/meetings" : scope === "customer" ? "/meetings/mine" : `/meetings/${scope}`, {
+        params: { page, view },
       })
       .then(({ data }) => {
         if (active) {
           setResult(data);
           setCheckedAt(Date.now());
           setError("");
+          if (page > data.totalPages) setPage(data.totalPages);
         }
       })
       .catch((error: unknown) => {
@@ -55,9 +62,9 @@ export default function MeetingList({
     return () => {
       active = false;
     };
-  }, [admin, page, reload, refreshKey]);
+  }, [admin, scope, page, view, reload, refreshKey]);
 
-  async function retryEmail(meeting: Meeting) {
+  async function retryEmail(meeting: { _id: string }) {
     setRetrying(meeting._id);
     setError("");
     setMessage("");
@@ -88,18 +95,14 @@ export default function MeetingList({
     setLoading(true);
     setReload((value) => value + 1);
   };
-  const meetings = result?.data ?? [];
-  const upcoming = meetings.filter(
-    (meeting) =>
-      meeting.status === "scheduled" &&
-      new Date(meeting.startTime).getTime() > checkedAt,
-  );
-  const rows = admin ? meetings : upcoming;
-  const requests = admin ? [] : (result?.requests ?? []);
+  const rows = result?.data ?? [];
+  const readOnly = !admin && scope !== "vp";
+  const showCreator = admin || scope !== "vp";
+  const requests = !admin && scope === "vp" && view === "upcoming" ? (result?.requests ?? []) : [];
   return (
     <section>
       <div className="section-heading">
-        <h2>{admin ? "Meetings and activity logs" : "Upcoming Meetings"}</h2>
+        <h2>{admin ? "Meetings and activity logs" : "Your meetings"}</h2>
         <button
           type="button"
           disabled={loading || !!retrying}
@@ -109,21 +112,38 @@ export default function MeetingList({
         </button>
       </div>
       {admin && (
-        <p>View who scheduled each meeting and its Zoom and email activity.</p>
+        <p>View the VP, customer, selected panelist, and each meeting's Zoom and email activity.</p>
       )}
+      {scope === "reviewer" && !admin && <p>Meeting history for the company forms assigned to you. This is a read-only oversight view.</p>}
+      <label className="mb-4 max-w-sm">
+        Meeting view
+        <select value={view} disabled={loading || !!retrying} onChange={(event) => {
+          setLoading(true);
+          setResult(null);
+          setPage(1);
+          setView(event.target.value as MeetingView);
+        }}>
+          {admin && <option value="all">All meetings and requests</option>}
+          <option value="upcoming">Upcoming and current meetings</option>
+          <option value="past">Past meetings</option>
+        </select>
+      </label>
+      {loading && <p role="status">Loading meetings...</p>}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
+      {!loading && !error && <>
       <div className="table-scroll">
         <table>
           <thead>
             <tr>
               <th>Topic</th>
               <th>Customer</th>
-              {admin && <th>Created by</th>}
+              <th>Panelist</th>
+              {showCreator && <th>Scheduled by</th>}
               <th>Meeting time</th>
               <th>Duration</th>
               <th>Status</th>
-              <th>Invitation</th>
+              {!readOnly && <th>Invitations</th>}
               <th>Actions</th>
               {admin && <th>Logs</th>}
             </tr>
@@ -141,7 +161,11 @@ export default function MeetingList({
                   {meeting.customerName}
                   <small>{meeting.customerEmail}</small>
                 </td>
-                {admin && (
+                <td>
+                  {meeting.panelistName ?? "Not assigned (older meeting)"}
+                  {meeting.panelistEmail && <small>{meeting.panelistEmail}</small>}
+                </td>
+                {showCreator && (
                   <td>
                     {meeting.creatorName}
                     <small>{meeting.creatorEmail}</small>
@@ -155,13 +179,13 @@ export default function MeetingList({
                   <small>{meeting.timezone}</small>
                 </td>
                 <td>{meeting.duration} min</td>
-                <td>{statuses[meeting.status]}</td>
-                <td>
-                  {emailStatuses[meeting.emailStatus]}
+                <td>{meetingPhase(meeting, checkedAt) ?? statuses[meeting.status]}</td>
+                {!readOnly && <td>
+                  {emailStatuses[meeting.emailStatus ?? "not_sent"]}
                   {meeting.emailError && (
                     <small className="error-text">{meeting.emailError}</small>
                   )}
-                </td>
+                </td>}
                 <td>
                   <div className="user-actions">
                     {meeting.status === "scheduled" && meeting.joinUrl && (
@@ -170,11 +194,11 @@ export default function MeetingList({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Join meeting
+                        {meetingPhase(meeting, checkedAt) === "Past" ? "Meeting link" : "Join meeting"}
                       </a>
                     )}
-                    {meeting.status === "scheduled" &&
-                      ["failed", "not_sent"].includes(meeting.emailStatus) &&
+                    {!readOnly && meeting.status === "scheduled" &&
+                      ["failed", "not_sent"].includes(meeting.emailStatus ?? "not_sent") &&
                       new Date(meeting.startTime).getTime() > checkedAt && (
                         <button
                           type="button"
@@ -186,6 +210,7 @@ export default function MeetingList({
                             : "Retry Email"}
                         </button>
                       )}
+                    {scope === "reviewer" && !admin && <span className="text-xs text-slate-500">Read-only</span>}
                   </div>
                 </td>
                 {admin && (
@@ -220,9 +245,7 @@ export default function MeetingList({
       </div>
       {!loading && !error && !rows.length && (
         <p>
-          {admin
-            ? "No meetings have been requested."
-            : "No upcoming meetings on this page."}
+          {view === "past" ? "No past meetings found." : view === "all" ? "No meetings have been requested." : "No upcoming or current meetings found."}
         </p>
       )}
       {!!requests.length && (
@@ -275,6 +298,7 @@ export default function MeetingList({
           </button>
         </div>
       )}
+      </>}
     </section>
   );
 }

@@ -13,7 +13,8 @@ All paths are under `/api/company-submissions`, require a bearer token for an ac
 
 - `GET /reviewer` (reviewer): only profiles assigned to this reviewer.
 - `GET /admin` (super_admin): all profiles and submitted reviewer feedback.
-- `GET /vp` (vp): only profiles for customers currently assigned to the requesting VP using the existing CustomerAccess records. Revoking access removes visibility on the next request.
+- `GET /vp` (vp): only reviewed profiles for customers currently assigned to the requesting VP using the existing CustomerAccess records. Revoking access removes visibility on the next request.
+- `GET /panelist` (panelist): a shared queue of reviewed company profiles and reviewer feedback. Pending submissions are excluded. The VP chooses the individual panelist when scheduling a call; see [panelist and meeting workflow](panelist-meetings.md).
 - List endpoints accept `page` (default 1) and `limit` (default 10, maximum 50), returning `data: CompanySubmission[]`, `page`, `total`, and `totalPages` (at least 1). Profiles are sorted newest first. Invalid pagination returns `400`.
 - `PATCH /:submissionId/feedback` (reviewer): body `{ "comments": "..." }`, 1–10000 trimmed characters, no unknown fields. Only the assigned reviewer may finalize feedback. The atomic update records `reviewerComments`, `reviewedAt`, and `status: reviewed` and returns `200` with the profile. `400` for invalid ID/body; `404` for unknown/unassigned profile; `409` if already reviewed. Submitted feedback is immutable.
 
@@ -21,4 +22,4 @@ All paths are under `/api/company-submissions`, require a bearer token for an ac
 
 ## Local verification
 
-Run `npm run build` from `backend` to check TypeScript. The previously referenced `tests/company-submissions.test.mjs` is not included in this checkout. Until the integration suite is added, use the [manual workflow](../../README.md#6-try-the-complete-workflow) to verify customer submission, reviewer feedback, admin visibility, and VP assignment/revocation.
+Run `npm run build` from `backend` to check TypeScript. `npm test` or `npm run test:meetings` exercises company submission, review handoff, panelist scheduling, role-scoped meeting history, and invitation retries against real MongoDB with local Zoom/SMTP stand-ins. See the [manual workflow](../../README.md#6-try-the-complete-workflow) to try the flow in the browser.

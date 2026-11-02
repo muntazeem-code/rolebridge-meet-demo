@@ -1,13 +1,16 @@
 ﻿import nodemailer from "nodemailer";
 
 export class MeetingMailError extends Error {
-  constructor(message: string) {
+  constructor(message: string, public acceptedEmails: string[] = []) {
     super(message);
   }
 }
 export async function sendMeetingInvitation(meeting: {
   customerEmail: string;
   customerName: string;
+  panelistEmail?: string;
+  panelistName?: string;
+  invitedEmails?: string[];
   creatorName: string;
   topic: string;
   startTime: Date;
@@ -15,6 +18,10 @@ export async function sendMeetingInvitation(meeting: {
   duration: number;
   joinUrl?: string;
 }) {
+  const recipients = [...new Set([meeting.customerEmail, meeting.panelistEmail]
+    .filter((email): email is string => !!email))]
+    .filter((email) => !(meeting.invitedEmails ?? []).includes(email));
+  if (!recipients.length) return [];
   const { SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
   if (
     !SMTP_HOST ||
@@ -45,15 +52,18 @@ export async function sendMeetingInvitation(meeting: {
   try {
     const info = await transporter.sendMail({
       from: MAIL_FROM,
-      to: meeting.customerEmail,
+      to: recipients,
       subject: "Meeting invitation: " + meeting.topic,
-      text: `Hello ${meeting.customerName},\n\n${meeting.creatorName} has scheduled a meeting with you.\n\nTopic: ${meeting.topic}\nWhen: ${localTime}\nTimezone: ${meeting.timezone}\nDuration: ${meeting.duration} minutes\n\nJoin Zoom: ${meeting.joinUrl}\n\nPlease use the participant link above.\n`,
+      text: `Hello,\n\n${meeting.creatorName} has scheduled a meeting with customer ${meeting.customerName}${meeting.panelistName ? ` and panelist ${meeting.panelistName}` : ""}.\n\nTopic: ${meeting.topic}\nWhen: ${localTime}\nTimezone: ${meeting.timezone}\nDuration: ${meeting.duration} minutes\n\nJoin Zoom: ${meeting.joinUrl}\n\nPlease use the participant link above.\n`,
     });
-    if (!info.accepted?.length || info.rejected?.length) {
+    const accepted = (info.accepted ?? []).map(String);
+    if (recipients.some((email) => !accepted.includes(email))) {
       throw new MeetingMailError(
-        "EMAIL_REJECTED: The mail server did not accept the customer invitation.",
+        "EMAIL_REJECTED: The mail server did not accept all participant invitations.",
+        accepted,
       );
     }
+    return accepted;
   } catch (error) {
     if (error instanceof MeetingMailError) throw error;
     const failure = error as { code?: string; responseCode?: number };

@@ -30,7 +30,9 @@ export default function DashboardLayout({
             </p>
           </div>
         </div>
-        <WorkspaceSwitcher roles={user.roles} />
+        {!user.roles.some((role) => role.name === "customer") && (
+          <WorkspaceSwitcher roles={user.roles} />
+        )}
         <button
           type="button"
           className="button-secondary shrink-0 self-end"

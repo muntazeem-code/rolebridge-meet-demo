@@ -46,7 +46,9 @@ the frontend origin. Restart Vite after changing `.env`; rebuild for deployed ch
   may use these endpoints; they return 400 for invalid input, 403 for forbidden
   operations, and 404 for missing users. Role changes apply to subsequent API requests.
 - The VP dashboard schedules meetings through `POST /api/meetings` and lists
-  upcoming meetings from `GET /api/meetings`. The form sends a stable request UUID
+  upcoming/current and past meetings from `GET /api/meetings`. Scheduling requires
+  a completed company review and an active panelist, loaded through
+  `GET /api/meetings/panelists?customerId=...`. The form sends a stable request UUID
   to prevent duplicate Zoom meetings after a request is retried.
 - Super Admin can assign customers to VPs under **Customer access for VPs**,
   view meetings and their creators, inspect activity logs, and retry failed invitations.
@@ -61,7 +63,12 @@ the frontend origin. Restart Vite after changing `.env`; rebuild for deployed ch
 - Reviewers load assigned forms through `GET /api/company-submissions/reviewer`
   and finalize comments through `PATCH /api/company-submissions/:submissionId/feedback`.
 - Admin and VP submission lists use `GET /api/company-submissions/admin` and
-  `GET /api/company-submissions/vp`. VP visibility follows current admin assignments.
+  `GET /api/company-submissions/vp`. VP visibility requires a completed review and follows current admin assignments.
+- Panelists see the shared completed-review queue through `GET /api/company-submissions/panelist`
+  and their selected calls through `GET /api/meetings/panelist`.
+- All five dashboards expose upcoming/current and past meeting views, refreshed every minute.
+  Reviewer meeting oversight uses `GET /api/meetings/reviewer` without joining links.
+  Past is determined from the scheduled start plus duration. The admin also has an all-requests view.
 - Panelist and Reviewer pages also load the welcome messages returned by
   `GET /api/dashboards/:role`. See the [company submission contract](../backend/docs/company-submissions.md).
 
@@ -75,6 +82,6 @@ contain 8–128 characters. Email delivery depends on the backend's SMTP configu
 - `npm run lint`: ESLint checks.
 - `npm run preview`: serve an existing production build locally on port 5174.
   Keep the backend running too; this is not a production hosting server.
-- Backend test scripts reference `backend/tests/`, which is not included in this
-  checkout. See the [root guide](../README.md#build-and-checks) for available checks.
+- In `backend`, `npm test` or `npm run test:meetings` exercises the workflow against
+  real MongoDB and local Zoom/SMTP stand-ins. The separate `test:admin` suite is not included.
 

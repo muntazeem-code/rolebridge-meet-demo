@@ -26,7 +26,8 @@ Run commands here so dotenv loads `backend/.env`. Restart the backend after chan
 Create and activate a Reviewer and Customer from the admin dashboard. The customer
 submits one company form with multiple support needs; the server assigns an active
 reviewer with the fewest pending reviews. The assigned reviewer submits final feedback.
-The admin sees all company forms and reviews. A VP sees only the forms and feedback
+The admin sees all company forms and reviews. Completed reviews appear automatically
+in a shared panelist queue. A VP sees only completed forms and feedback
 for customers currently assigned through **Customer access for VPs**. Customers see
 their own form and review status, without the internal comments.
 
@@ -34,18 +35,21 @@ See the [company submission contract](docs/company-submissions.md) for endpoint 
 
 ## Meeting workflow
 
-1. In the super-admin dashboard, create active users with Customer and VP roles.
+1. In the super-admin dashboard, create and activate Customer, VP, Reviewer, and Panelist accounts.
 2. Under **Customer access for VPs**, assign each customer to one or more VPs.
    Existing customers start with no VP access until assigned.
-3. In the VP dashboard, choose **Schedule Meeting**, an assigned customer, a topic,
+3. Complete the customer's company review. In the VP dashboard, choose **Schedule Meeting**, a reviewed assigned customer, an active panelist, a topic,
    date, time, IANA timezone, and duration (1–1440 minutes).
-4. The backend verifies the current account, VP role, customer role/status, and assignment.
-5. It persists a scheduling request and creator/customer identity snapshots, creates
-   the Zoom meeting, saves its participant link, and sends the customer invitation.
-6. The VP sees future scheduled meetings. The super admin sees every scheduling
-   request, creator, customer, Zoom ID, email status, and timestamped activity log.
+4. The backend verifies the VP, customer assignment, completed review, and selected panelist. The VP, customer, and panelist must be different accounts.
+5. It persists a scheduling request and VP/customer/panelist identity snapshots, creates
+   the Zoom meeting, saves its participant link, and invites both customer and panelist.
+6. Every dashboard has an upcoming/current and past meeting view scoped to that user.
+   The super admin sees all requests, participants, Zoom IDs, email status, and activity logs.
 7. If SMTP fails, the meeting stays scheduled. **Retry Email** reuses its Zoom link.
-   A sent invitation cannot be sent again through this retry action.
+   Only recipients not already accepted by SMTP are retried. A completely sent invitation cannot be sent again through this action.
+
+The full [panelist and meeting history contract](docs/panelist-meetings.md) describes
+the shared review queue, panelist selection, time boundaries, and read-only reviewer history.
 
 ### Zoom setup
 
@@ -83,9 +87,12 @@ initial password change has been completed.
 
 | Endpoint                                     | Role                      | Behavior                                                                                                                                        |
 | -------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET /api/meetings/customers                  | VP                        | List only active Customer users assigned to this VP.                                                                                            |
-| POST /api/meetings                           | VP                        | Create a Zoom meeting for an assigned active customer.                                                                                          |
-| GET /api/meetings?page=1                     | VP                        | Own future scheduled meetings ordered by start time; also includes the latest 10 unsuccessful/in-progress requests.                             |
+| GET /api/meetings/customers                  | VP                        | Active assigned customers with a completed company review. |
+| GET /api/meetings/panelists?customerId=:id    | VP                        | Eligible active panelists for this reviewed, assigned customer. |
+| POST /api/meetings                           | VP                        | Create a Zoom meeting for a reviewed assigned customer and selected active panelist. |
+| GET /api/meetings?page=1&view=upcoming        | VP                        | Own upcoming/current meetings; view=past lists history. Recent unsuccessful requests accompany upcoming results. |
+| GET /api/meetings/panelist?view=past         | Panelist                  | Scheduled calls where this account is the chosen panelist; also supports view=upcoming. |
+| GET /api/meetings/reviewer?view=past         | Reviewer                  | Read-only meeting history for this reviewer's company forms, without join links; also supports view=upcoming. |
 | GET /api/meetings/mine?page=1&view=upcoming  | Customer                  | Own upcoming/current scheduled meetings, participant links, topic, scheduling VP, timezone, date/time, and duration. Use view=past for history. |
 | POST /api/meetings/:id/retry-email           | Creator VP or Super Admin | Retry a failed/unsent invitation for a future scheduled meeting. Current customer access is checked for VP callers.                             |
 | GET /api/admin/meetings?page=1               | Super Admin               | All requests, including failed or uncertain requests, creator/customer snapshots, and activity logs.                                            |
@@ -97,6 +104,7 @@ Meeting creation body:
 ```json
 {
   "customerId": "customer-object-id",
+  "panelistId": "panelist-object-id",
   "topic": "Project planning",
   "date": "2030-05-20",
   "time": "14:30",
@@ -145,14 +153,18 @@ and 500/503 persistence or completion failure.
 
 ## Verification
 
-`npm run build` checks TypeScript and compiles the backend. Follow the manual
-workflow in the [root guide](../README.md#6-try-the-complete-workflow) to check roles,
-company submission, reviewer feedback, and VP assignment.
+`npm run build` checks TypeScript and compiles the backend. `npm test` or
+`npm run test:meetings` builds and runs the panelist workflow integration suite.
+Set `MONGO_URI`; tests use a uniquely named database and remove their fixture records.
+The real HTTP/authentication/model code, Zoom fetch client, and Nodemailer client
+run against local Zoom HTTP and SMTP protocol stand-ins. Tests cover the review
+handoff, permissions, panelist selection, attribution, role-scoped history,
+in-progress/past boundaries, partial SMTP failures/retries, and Zoom denial/timeouts.
 
-The package defines `npm test`, `npm run test:admin`, and `npm run test:meetings`,
-but the referenced `tests/` files are not included in this checkout. These commands
-cannot execute the integration suites until the test files are added. Do not treat
-a successful build as verification of live Zoom creation or email delivery.
+The HTTP stand-in models the OAuth and meeting response shapes used by the existing
+Zoom client. Postman CLI was unavailable, so these tests run the local stand-ins
+directly. Live Zoom account permissions and actual inbox delivery are not verified.
+`npm run test:admin` still references an admin-user suite absent from this checkout.
 
 Test overrides `ZOOM_API_BASE_URL`, `ZOOM_TOKEN_URL`, and `ZOOM_TIMEOUT_MS` are backend
 settings only. Normal deployments should use the default official Zoom URLs.

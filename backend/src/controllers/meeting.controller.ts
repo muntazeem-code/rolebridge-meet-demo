@@ -10,6 +10,7 @@ import { Meeting, type IMeeting } from "../models/Meeting.js";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
 import { CustomerAccess } from "../models/CustomerAccess.js";
+import { CompanySubmission } from "../models/CompanySubmission.js";
 import {
   createZoomMeeting,
   ZoomServiceError,
@@ -23,6 +24,7 @@ import { meetingStartTime } from "../utils/meeting-time.js";
 const schema = z
   .object({
     customerId: z.string().refine(isObjectIdOrHexString, "Invalid customer ID"),
+    panelistId: z.string().refine(isObjectIdOrHexString, "Invalid panelist ID"),
     topic: z.string().trim().min(2).max(200),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
@@ -52,7 +54,7 @@ function log(
 function publicMeeting(meeting: HydratedDocument<IMeeting>, admin = false) {
   const data = meeting.toObject();
   if (admin) return data;
-  const { logs: _logs, ...visible } = data;
+  const { logs: _logs, invitedEmails: _recipients, ...visible } = data;
   return visible;
 }
 async function allowedCustomer(vpId: string, customerId: string) {
@@ -67,7 +69,8 @@ async function allowedCustomer(vpId: string, customerId: string) {
 }
 async function deliver(meeting: HydratedDocument<IMeeting>, actor: Actor) {
   try {
-    await sendMeetingInvitation(meeting);
+    const accepted = await sendMeetingInvitation(meeting);
+    meeting.invitedEmails = [...new Set([...(meeting.invitedEmails ?? []), ...accepted])];
     meeting.emailStatus = "sent";
     meeting.emailSentAt = new Date();
     meeting.emailError = undefined;
@@ -78,6 +81,9 @@ async function deliver(meeting: HydratedDocument<IMeeting>, actor: Actor) {
       "Invitation accepted by the configured SMTP server.",
     );
   } catch (error) {
+    if (error instanceof MeetingMailError) {
+      meeting.invitedEmails = [...new Set([...(meeting.invitedEmails ?? []), ...error.acceptedEmails])];
+    }
     meeting.emailStatus = "failed";
     meeting.emailError =
       error instanceof MeetingMailError
@@ -135,6 +141,7 @@ export const scheduleMeeting = async (
     const replyExisting = (existing: HydratedDocument<IMeeting>) => {
       if (
         existing.customerId.toString() !== input.customerId ||
+        existing.panelistId?.toString() !== input.panelistId ||
         existing.topic !== input.topic ||
         existing.startTime.getTime() !== startTime.getTime() ||
         existing.timezone !== input.timezone ||
@@ -167,6 +174,19 @@ export const scheduleMeeting = async (
       replyExisting(existing);
       return;
     }
+    const submission = await CompanySubmission.findOne({ customer: customer._id, status: "reviewed" });
+    if (!submission) {
+      res.status(409).json({ success: false, message: "The customer's company review must be completed before scheduling a panelist call." });
+      return;
+    }
+    const panelistRole = await Role.findOne({ name: "panelist" });
+    const panelist = panelistRole ? await User.findOne({
+      _id: input.panelistId, status: "active", roles: panelistRole._id,
+    }) : null;
+    if (!panelist || panelist.id === req.userId || panelist.id === customer.id) {
+      res.status(400).json({ success: false, message: "Select an active panelist other than the VP or customer." });
+      return;
+    }
     if (startTime.getTime() <= Date.now()) {
       res.status(400).json({
         success: false,
@@ -188,6 +208,10 @@ export const scheduleMeeting = async (
         customerId: customer._id,
         customerName: customer.fullName,
         customerEmail: customer.email,
+        panelistId: panelist._id,
+        panelistName: panelist.fullName,
+        panelistEmail: panelist.email,
+        companySubmissionId: submission._id,
         requestId: input.requestId,
         topic: input.topic,
         startTime,
@@ -198,7 +222,7 @@ export const scheduleMeeting = async (
         logs: [
           {
             event: "requested",
-            message: "VP requested a Zoom meeting.",
+            message: `VP requested a Zoom meeting with customer ${customer.fullName} and panelist ${panelist.fullName}.`,
             level: "info",
             actorId: creator._id,
             actorName: creator.fullName,
@@ -258,7 +282,7 @@ export const scheduleMeeting = async (
       meeting,
       creator,
       "email_sending",
-      "Sending the customer's invitation.",
+      "Sending customer and panelist invitations.",
     );
     try {
       await meeting.save();
@@ -303,9 +327,12 @@ export const getMeetingCustomers = async (
       "customer",
     );
     const role = await Role.findOne({ name: "customer" });
+    const reviewed = await CompanySubmission.find({
+      customer: { $in: assignments.map((entry) => entry.customer) }, status: "reviewed",
+    }).select("customer");
     const customers = role
       ? await User.find({
-          _id: { $in: assignments.map((entry) => entry.customer) },
+          _id: { $in: reviewed.map((entry) => entry.customer) },
           roles: role._id,
           status: "active",
         })
@@ -320,107 +347,90 @@ export const getMeetingCustomers = async (
   }
 };
 
-export const getMeetings = async (
-  req: AuthRequest,
-  res: Response,
-): Promise<void> => {
+export const getMeetingPanelists = async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = z.object({ customerId: z.string().refine(isObjectIdOrHexString) }).strict().safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, message: "Provide a valid customer ID." });
+    return;
+  }
   try {
-    const admin = req.path === "/meetings" && req.baseUrl === "/api/admin";
-    const page = Math.max(1, Math.min(100000, Number(req.query.page) || 1));
-    const limit = 25;
-    const filter: QueryFilter<IMeeting> = admin
-      ? {}
-      : {
-          createdBy: req.userId,
-          status: "scheduled",
-          startTime: { $gt: new Date() },
-        };
-    const [meetings, total, requests] = await Promise.all([
-      Meeting.find(filter)
-        .sort(admin ? { createdAt: -1, _id: -1 } : { startTime: 1, _id: 1 })
-        .skip((Math.floor(page) - 1) * limit)
-        .limit(limit),
-      Meeting.countDocuments(filter),
-      admin
-        ? []
-        : Meeting.find({ createdBy: req.userId, status: { $ne: "scheduled" } })
-            .sort({ createdAt: -1 })
-            .limit(10),
-    ]);
-    res.json({
-      success: true,
-      data: meetings.map((meeting) => publicMeeting(meeting, admin)),
-      ...(!admin
-        ? { requests: requests.map((meeting) => publicMeeting(meeting)) }
-        : {}),
-      page: Math.floor(page),
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    });
+    const customer = await allowedCustomer(req.userId!, parsed.data.customerId);
+    if (!customer) {
+      res.status(403).json({ success: false, message: "You do not have access to this customer." });
+      return;
+    }
+    if (!(await CompanySubmission.exists({ customer: customer._id, status: "reviewed" }))) {
+      res.status(409).json({ success: false, message: "The customer's company review is not complete." });
+      return;
+    }
+    const role = await Role.findOne({ name: "panelist" });
+    const data = role ? await User.find({
+      roles: role._id, status: "active", _id: { $nin: [req.userId, customer._id] },
+    }).select("_id fullName email").sort({ fullName: 1, _id: 1 }) : [];
+    res.json({ success: true, data });
   } catch {
-    res
-      .status(500)
-      .json({ success: false, message: "Unable to load meetings." });
+    res.status(500).json({ success: false, message: "Unable to load panelists." });
   }
 };
 
-export const getCustomerMeetings = async (
-  req: AuthRequest,
-  res: Response,
-): Promise<void> => {
+type MeetingScope = "admin" | "vp" | "customer" | "panelist" | "reviewer";
+
+async function listMeetings(req: AuthRequest, res: Response, scope: MeetingScope): Promise<void> {
+  const parsed = z.object({
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    view: z.enum(["all", "upcoming", "past"]).default(scope === "admin" ? "all" : "upcoming"),
+  }).strict().safeParse(req.query);
+  if (!parsed.success || (scope !== "admin" && parsed.data.view === "all")) {
+    res.status(400).json({ success: false, message: "Provide a valid page and meeting view." });
+    return;
+  }
   try {
-    const parsed = z
-      .object({
-        page: z.coerce.number().int().min(1).max(100000).default(1),
-        view: z.enum(["upcoming", "past"]).default("upcoming"),
-      })
-      .strict()
-      .safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: "Provide a valid page and meeting view.",
-      });
-      return;
-    }
     const { page, view } = parsed.data;
+    const admin = scope === "admin";
+    const participant = scope === "customer" || scope === "panelist" || scope === "reviewer";
+    const filter: QueryFilter<IMeeting> = {};
+    if (scope === "vp") filter.createdBy = req.userId;
+    if (scope === "customer") filter.customerId = req.userId;
+    if (scope === "panelist") filter.panelistId = req.userId;
+    if (scope === "reviewer") {
+      const submissions = await CompanySubmission.find({ reviewer: req.userId }).select("customer");
+      filter.customerId = { $in: submissions.map((submission) => submission.customer) };
+    }
+    if (view !== "all") {
+      const endTime = { $add: ["$startTime", { $multiply: ["$duration", 60000] }] };
+      filter.status = "scheduled";
+      filter.$expr = view === "past" ? { $lte: [endTime, new Date()] } : { $gt: [endTime, new Date()] };
+    }
     const limit = 25;
-    // The account ID always comes from the verified JWT, never from query parameters.
-    // Include a meeting already in progress until its scheduled duration has elapsed.
-    const endTime = {
-      $add: ["$startTime", { $multiply: ["$duration", 60000] }],
-    };
-    const filter: QueryFilter<IMeeting> = {
-      customerId: req.userId,
-      status: "scheduled",
-      $expr:
-        view === "past"
-          ? { $lte: [endTime, new Date()] }
-          : { $gt: [endTime, new Date()] },
-    };
-    const [meetings, total] = await Promise.all([
-      Meeting.find(filter)
-        .select(
-          "_id topic startTime timezone duration status zoomMeetingId joinUrl creatorName creatorEmail createdAt",
-        )
-        .sort({ startTime: view === "past" ? -1 : 1, _id: 1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
+    const query = Meeting.find(filter).sort(view === "all" ? { createdAt: -1, _id: -1 } : { startTime: view === "past" ? -1 : 1, _id: 1 })
+      .skip((page - 1) * limit).limit(limit);
+    if (participant) {
+      query.select(`_id topic startTime timezone duration status zoomMeetingId creatorName creatorEmail customerName customerEmail panelistName panelistEmail createdAt${scope === "reviewer" ? "" : " joinUrl"}`);
+    }
+    const [meetings, total, requests] = await Promise.all([
+      query,
       Meeting.countDocuments(filter),
+      scope === "vp" && view === "upcoming"
+        ? Meeting.find({ createdBy: req.userId, status: { $ne: "scheduled" } }).sort({ createdAt: -1 }).limit(10)
+        : [],
     ]);
     res.json({
       success: true,
-      data: meetings,
-      page,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
+      data: meetings.map((meeting) => participant ? meeting.toObject() : publicMeeting(meeting, admin)),
+      ...(scope === "vp" ? { requests: requests.map((meeting) => publicMeeting(meeting)) } : {}),
+      page, total, totalPages: Math.max(1, Math.ceil(total / limit)),
     });
   } catch {
-    res
-      .status(500)
-      .json({ success: false, message: "Unable to load your meetings." });
+    res.status(500).json({ success: false, message: "Unable to load meetings." });
   }
-};
+}
+
+export const getMeetings = (req: AuthRequest, res: Response): Promise<void> =>
+  listMeetings(req, res, req.baseUrl === "/api/admin" ? "admin" : "vp");
+export const getCustomerMeetings = (req: AuthRequest, res: Response): Promise<void> =>
+  listMeetings(req, res, "customer");
+export const getParticipantMeetings = (scope: "panelist" | "reviewer") =>
+  (req: AuthRequest, res: Response): Promise<void> => listMeetings(req, res, scope);
 
 export const retryMeetingEmail = async (
   req: AuthRequest,
@@ -475,6 +485,14 @@ export const retryMeetingEmail = async (
       });
       return;
     }
+    const panelistRole = meeting.panelistId ? await Role.findOne({ name: "panelist" }) : null;
+    const panelist = meeting.panelistId && panelistRole ? await User.findOne({
+      _id: meeting.panelistId, status: "active", roles: panelistRole._id,
+    }) : null;
+    if (meeting.panelistId && !panelist) {
+      res.status(409).json({ success: false, message: "The selected panelist is no longer active." });
+      return;
+    }
     const actor = await User.findById(req.userId);
     if (!actor) {
       res.status(401).json({ success: false, message: "Account not found." });
@@ -491,6 +509,7 @@ export const retryMeetingEmail = async (
           emailStatus: "sending",
           customerEmail: customer.email,
           customerName: customer.fullName,
+          ...(panelist ? { panelistName: panelist.fullName, panelistEmail: panelist.email } : {}),
         },
       },
       { returnDocument: "after" },

@@ -156,7 +156,7 @@ export async function submitCompany(
   }
 }
 
-export function listSubmissions(scope: "reviewer" | "admin" | "vp") {
+export function listSubmissions(scope: "reviewer" | "admin" | "vp" | "panelist") {
   return async (req: AuthRequest, res: Response): Promise<void> => {
     const parsed = z
       .object({
@@ -176,8 +176,10 @@ export function listSubmissions(scope: "reviewer" | "admin" | "vp") {
       const filter: {
         reviewer?: string;
         customer?: { $in: Types.ObjectId[] };
+        status?: "reviewed";
       } = {};
       if (scope === "reviewer") filter.reviewer = req.userId;
+      if (scope === "vp" || scope === "panelist") filter.status = "reviewed";
       if (scope === "vp") {
         const access = await CustomerAccess.find({ vpIds: req.userId }).select(
           "customer",
@@ -250,7 +252,7 @@ export async function submitFeedback(
     res.json({
       success: true,
       message:
-        "Feedback sent. The admin and assigned VPs can now see your review.",
+        "Feedback sent. Panelists, the admin and assigned VPs can now see your review.",
       data,
     });
   } catch {

@@ -15,5 +15,6 @@ router.post("/", authorize("customer"), submitCompany);
 router.get("/reviewer", authorize("reviewer"), listSubmissions("reviewer"));
 router.get("/admin", authorize("super_admin"), listSubmissions("admin"));
 router.get("/vp", authorize("vp"), listSubmissions("vp"));
+router.get("/panelist", authorize("panelist"), listSubmissions("panelist"));
 router.patch("/:submissionId/feedback", authorize("reviewer"), submitFeedback);
 export default router;

@@ -2,6 +2,7 @@
 import { api, getApiError } from "../services/api";
 import type { MessageResponse, RoleName } from "../types/auth";
 import CompanySubmissions from "../components/CompanySubmissions";
+import MeetingList from "../components/MeetingList";
 
 export default function RoleDashboard({
   role,
@@ -37,6 +38,8 @@ export default function RoleDashboard({
       )}
     </section>
     {role === "reviewer" && <CompanySubmissions scope="reviewer" />}
+    {role === "panelist" && <CompanySubmissions scope="panelist" />}
+    {(role === "reviewer" || role === "panelist") && <MeetingList scope={role} />}
     </>
   );
 }

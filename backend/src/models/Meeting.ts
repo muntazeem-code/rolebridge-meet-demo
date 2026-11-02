@@ -17,6 +17,10 @@ export interface IMeeting {
   customerId: Types.ObjectId;
   customerName: string;
   customerEmail: string;
+  panelistId?: Types.ObjectId;
+  panelistName?: string;
+  panelistEmail?: string;
+  companySubmissionId?: Types.ObjectId;
   requestId: string;
   topic: string;
   startTime: Date;
@@ -28,6 +32,7 @@ export interface IMeeting {
   emailStatus: "not_sent" | "sending" | "sent" | "failed";
   emailSentAt?: Date;
   emailError?: string;
+  invitedEmails: string[];
   logs: IMeetingLog[];
   createdAt: Date;
 }
@@ -47,6 +52,10 @@ const schema = new Schema<IMeeting>({
   customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   customerName: { type: String, required: true },
   customerEmail: { type: String, required: true },
+  panelistId: { type: Schema.Types.ObjectId, ref: "User" },
+  panelistName: String,
+  panelistEmail: String,
+  companySubmissionId: { type: Schema.Types.ObjectId, ref: "CompanySubmission" },
   requestId: { type: String, required: true },
   topic: { type: String, required: true, maxlength: 200 },
   startTime: { type: Date, required: true },
@@ -58,10 +67,13 @@ const schema = new Schema<IMeeting>({
   emailStatus: { type: String, enum: ["not_sent", "sending", "sent", "failed"], default: "not_sent" },
   emailSentAt: Date,
   emailError: String,
+  invitedEmails: { type: [String], default: [] },
   logs: { type: [logSchema], default: [] },
 }, { timestamps: true });
 schema.index({ createdBy: 1, requestId: 1 }, { unique: true });
 schema.index({ createdBy: 1, startTime: 1 });
+schema.index({ panelistId: 1, startTime: 1 });
+schema.index({ customerId: 1, startTime: 1 });
 schema.index({ createdAt: -1 });
 export const Meeting = mongoose.model<IMeeting>("Meeting", schema);
 

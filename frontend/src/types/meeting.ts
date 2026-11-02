@@ -15,6 +15,11 @@ export interface Meeting {
   customerId: string;
   customerName: string;
   customerEmail: string;
+  panelistId?: string;
+  panelistName?: string;
+  panelistEmail?: string;
+  companySubmissionId?: string;
+  invitedEmails?: string[];
   requestId: string;
   topic: string;
   startTime: string;
@@ -30,12 +35,17 @@ export interface Meeting {
 }
 export interface MeetingPage {
   success: boolean;
-  data: Meeting[];
+  data: MeetingDetails[];
   page: number;
   total: number;
   totalPages: number;
   requests?: Meeting[];
 }
+export type MeetingDetails = Pick<
+  Meeting,
+  "_id" | "topic" | "startTime" | "timezone" | "duration" | "status" |
+  "creatorName" | "creatorEmail" | "customerName" | "customerEmail" | "createdAt"
+> & Partial<Meeting>;
 export interface CustomerOption {
   _id: string;
   fullName: string;
@@ -56,8 +66,19 @@ export type CustomerMeeting = Pick<
   | "joinUrl"
   | "creatorName"
   | "creatorEmail"
+  | "panelistName"
+  | "panelistEmail"
   | "createdAt"
 >;
+
+export type MeetingView = "all" | "upcoming" | "past";
+
+export function meetingPhase(meeting: Pick<Meeting, "startTime" | "duration" | "status">, now = Date.now()) {
+  if (meeting.status !== "scheduled") return null;
+  const start = new Date(meeting.startTime).getTime();
+  if (start + meeting.duration * 60000 <= now) return "Past";
+  return start <= now ? "In progress" : "Upcoming";
+}
 
 export function meetingTime(meeting: Pick<Meeting, "startTime" | "timezone">) {
   return new Intl.DateTimeFormat("en-IN", {

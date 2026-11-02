@@ -25,14 +25,14 @@ function FeedbackForm({ submission, onSaved }: { submission: CompanySubmission; 
   return (
     <form className="feedback-form" onSubmit={send}>
       <label>Review comments *<textarea required rows={5} maxLength={10000} value={comments} disabled={busy} onChange={(event) => setComments(event.target.value)} placeholder="Review the company, its support needs, and your recommendations." /></label>
-      <p>Sending finalizes your review and shares it with the admin and any VPs assigned to this customer.</p>
+      <p>Sending finalizes your review and shares it with panelists, the admin and any VPs assigned to this customer.</p>
       <button type="submit" disabled={busy}>{busy ? "Sending..." : "Send feedback"}</button>
       {error && <p role="alert">{error}</p>}
     </form>
   );
 }
 
-export default function CompanySubmissions({ scope, refreshKey = 0 }: { scope: "reviewer" | "admin" | "vp"; refreshKey?: number }) {
+export default function CompanySubmissions({ scope, refreshKey = 0 }: { scope: "reviewer" | "admin" | "vp" | "panelist"; refreshKey?: number }) {
   const [result, setResult] = useState<CompanySubmissionPage | null>(null);
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
@@ -59,7 +59,7 @@ export default function CompanySubmissions({ scope, refreshKey = 0 }: { scope: "
         <h2>{scope === "reviewer" ? "Assigned company reviews" : "Company forms & reviewer feedback"}</h2>
         <button type="button" disabled={loading} onClick={() => { setLoading(true); setReload((value) => value + 1); }}>Refresh submissions</button>
       </div>
-      <p>{scope === "admin" ? "View submitted company details and reviewer feedback. Use customer assignments to give VPs access." : scope === "vp" ? "View company details and reviewer feedback for customers currently assigned to you." : "Review the company forms automatically assigned to you and send your feedback."}</p>
+      <p>{scope === "admin" ? "View submitted company details and reviewer feedback. Use customer assignments to give VPs access." : scope === "vp" ? "View completed company reviews for customers assigned to you, then select a panelist when scheduling their call." : scope === "panelist" ? "Completed reviews arrive here automatically. Read the company profile and feedback to prepare for a call. The VP will select the panelist and schedule the customer meeting." : "Review the company forms automatically assigned to you and send your feedback."}</p>
       {loading && <p role="status">Loading company submissions...</p>}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
@@ -72,7 +72,7 @@ export default function CompanySubmissions({ scope, refreshKey = 0 }: { scope: "
               {submission.status === "submitted" && (scope === "reviewer" ? (
                 <FeedbackForm submission={submission} onSaved={(saved) => {
                   setResult((previous) => previous ? { ...previous, data: previous.data.map((entry) => entry._id === saved._id ? saved : entry) } : previous);
-                  setMessage(`Feedback sent for ${saved.companyName}. The admin and assigned VPs can now view it.`);
+                  setMessage(`Feedback sent for ${saved.companyName}. Panelists, the admin and assigned VPs can now view it.`);
                 }} />
               ) : <p>Reviewer feedback is pending.</p>)}
             </article>

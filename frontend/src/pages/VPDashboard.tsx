@@ -20,6 +20,10 @@ export default function VPDashboard() {
   const [customerError, setCustomerError] = useState("");
   const [open, setOpen] = useState(false);
   const [customerId, setCustomerId] = useState("");
+  const [panelistId, setPanelistId] = useState("");
+  const [panelists, setPanelists] = useState<CustomerOption[]>([]);
+  const [panelistError, setPanelistError] = useState("");
+  const [panelistsLoading, setPanelistsLoading] = useState(false);
   const [topic, setTopic] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -53,6 +57,17 @@ export default function VPDashboard() {
       active = false;
     };
   }, [refreshKey]);
+  useEffect(() => {
+    if (!customerId) return;
+    let active = true;
+    api.get<{ data: CustomerOption[] }>("/meetings/panelists", { params: { customerId } })
+      .then(({ data }) => { if (active) { setPanelists(data.data); setPanelistError(""); } })
+      .catch((error: unknown) => {
+        if (active) { setPanelists([]); setPanelistError(getApiError(error, "Unable to load active panelists.")); }
+      })
+      .finally(() => { if (active) setPanelistsLoading(false); });
+    return () => { active = false; };
+  }, [customerId, refreshKey]);
   async function schedule(event: FormEvent) {
     event.preventDefault();
     if (submitting) return;
@@ -68,6 +83,7 @@ export default function VPDashboard() {
         "/meetings",
         {
           customerId,
+          panelistId,
           topic: topic.trim(),
           date,
           time,
@@ -84,6 +100,7 @@ export default function VPDashboard() {
         setTopic("");
         setDate("");
         setTime("");
+        setPanelistId("");
         setRequestId(crypto.randomUUID());
       }
     } catch (error) {
@@ -122,8 +139,8 @@ export default function VPDashboard() {
         {customerError && <p role="alert">{customerError}</p>}
         {!loading && !customerError && !customers.length && (
           <p>
-            No active customers are assigned to you. Ask the super admin to
-            assign a customer.
+            No reviewed customers are ready for scheduling. The admin must assign
+            the customer to you, and the reviewer must complete the company review first.
           </p>
         )}
         <button
@@ -137,17 +154,23 @@ export default function VPDashboard() {
         {error && <p role="alert">{error}</p>}
         {open && (
           <form className="meeting-form" onSubmit={schedule}>
-            <h2>Schedule a customer meeting</h2>
+          <h2>Schedule a customer and panelist call</h2>
             <label>
               Customer
               <select
                 value={customerId}
                 disabled={submitting}
-                onChange={(event) => setCustomerId(event.target.value)}
+                onChange={(event) => {
+                  setCustomerId(event.target.value);
+                  setPanelistId("");
+                  setPanelists([]);
+                  setPanelistError("");
+                  setPanelistsLoading(true);
+                }}
                 required
               >
                 <option value="" disabled>
-                  Select an assigned customer
+                  Select a reviewed, assigned customer
                 </option>
                 {customers.map((customer) => (
                   <option key={customer._id} value={customer._id}>
@@ -156,6 +179,15 @@ export default function VPDashboard() {
                 ))}
               </select>
             </label>
+            <label>
+              Panelist
+              <select value={panelistId} disabled={submitting || !customerId || panelistsLoading || !!panelistError} required onChange={(event) => setPanelistId(event.target.value)}>
+                <option value="" disabled>{panelistsLoading ? "Loading panelists..." : "Select an active panelist"}</option>
+                {panelists.map((panelist) => <option key={panelist._id} value={panelist._id}>{panelist.fullName} ({panelist.email})</option>)}
+              </select>
+            </label>
+            {panelistError && <p role="alert">{panelistError}</p>}
+            {customerId && !panelistsLoading && !panelistError && !panelists.length && <p>No active panelists are available. Ask the admin to create or activate a panelist.</p>}
             <label>
               Topic
               <input
@@ -217,7 +249,7 @@ export default function VPDashboard() {
               />
             </label>
             <div className="user-actions">
-              <button type="submit" disabled={submitting}>
+              <button type="submit" disabled={submitting || panelistsLoading || !customers.some((customer) => customer._id === customerId) || !panelists.some((panelist) => panelist._id === panelistId)}>
                 {submitting ? "Scheduling..." : "Create Zoom Meeting"}
               </button>
               <button
