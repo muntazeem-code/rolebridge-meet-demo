@@ -20,6 +20,8 @@ export interface Meeting {
   panelistEmail?: string;
   companySubmissionId?: string;
   invitedEmails?: string[];
+  vpRating?: MeetingRating;
+  panelistRating?: MeetingRating;
   requestId: string;
   topic: string;
   startTime: string;
@@ -32,6 +34,40 @@ export interface Meeting {
   emailError?: string;
   logs?: MeetingLog[];
   createdAt: string;
+}
+export type RatingRole = "vp" | "panelist";
+
+export interface MeetingRating {
+  stars: number;
+  submittedAt: string;
+  submittedBy?: string;
+  overallCall?: number;
+  venturePreparedness?: number;
+  nextStepsClarity?: number;
+  improvement?: string;
+}
+
+export interface RatingSubmission {
+  meetingId: string;
+  role: RatingRole;
+  rating: MeetingRating;
+}
+
+export interface RatingNotification {
+  meetingId: string;
+  role: RatingRole;
+  topic: string;
+  customerName: string;
+  startTime: string;
+  timezone: string;
+  duration: number;
+}
+
+export interface RatingNotificationPage {
+  data: RatingNotification[];
+  page: number;
+  total: number;
+  totalPages: number;
 }
 export interface MeetingPage {
   success: boolean;

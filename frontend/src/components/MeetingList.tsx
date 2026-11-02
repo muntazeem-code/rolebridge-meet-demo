@@ -1,6 +1,8 @@
-﻿import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, getApiError } from "../services/api";
-import { meetingTime, meetingPhase, type Meeting, type MeetingPage, type MeetingView } from "../types/meeting";
+import { meetingTime, meetingPhase, type Meeting, type MeetingPage, type MeetingView, type RatingSubmission } from "../types/meeting";
+import { RATING_SUBMITTED_EVENT } from "../services/meeting-ratings";
+import MeetingRatings from "./MeetingRatings";
 
 const statuses = {
   creating: "Creating",
@@ -38,6 +40,20 @@ export default function MeetingList({
       setReload((value) => value + 1);
     }, 60000);
     return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const rated = (event: Event) => {
+      const { meetingId, role, rating } = (event as CustomEvent<RatingSubmission>).detail;
+      const field = role === "vp" ? "vpRating" : "panelistRating";
+      setResult((previous) => previous ? {
+        ...previous,
+        data: previous.data.map((meeting) => meeting._id === meetingId ? { ...meeting, [field]: rating } : meeting),
+      } : previous);
+      setMessage("Your meeting rating has been submitted.");
+      setReload((value) => value + 1);
+    };
+    window.addEventListener(RATING_SUBMITTED_EVENT, rated);
+    return () => window.removeEventListener(RATING_SUBMITTED_EVENT, rated);
   }, []);
   useEffect(() => {
     let active = true;
@@ -98,6 +114,7 @@ export default function MeetingList({
   const rows = result?.data ?? [];
   const readOnly = !admin && scope !== "vp";
   const showCreator = admin || scope !== "vp";
+  const columns = 7 + (showCreator ? 1 : 0) + (readOnly ? 0 : 1) + (admin ? 1 : 0);
   const requests = !admin && scope === "vp" && view === "upcoming" ? (result?.requests ?? []) : [];
   return (
     <section>
@@ -150,7 +167,8 @@ export default function MeetingList({
           </thead>
           <tbody>
             {rows.map((meeting) => (
-              <tr key={meeting._id}>
+              <Fragment key={meeting._id}>
+              <tr>
                 <td>
                   {meeting.topic}
                   {meeting.zoomMeetingId && (
@@ -239,6 +257,14 @@ export default function MeetingList({
                   </td>
                 )}
               </tr>
+              {meeting.status === "scheduled" && (
+                <tr>
+                  <td colSpan={columns} className="bg-slate-50/70 pt-2 pb-5">
+                    <MeetingRatings meeting={meeting} now={checkedAt} role={!admin && (scope === "vp" || scope === "panelist") ? scope : undefined} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

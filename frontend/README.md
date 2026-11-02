@@ -69,6 +69,14 @@ the frontend origin. Restart Vite after changing `.env`; rebuild for deployed ch
 - All five dashboards expose upcoming/current and past meeting views, refreshed every minute.
   Reviewer meeting oversight uses `GET /api/meetings/reviewer` without joining links.
   Past is determined from the scheduled start plus duration. The admin also has an all-requests view.
+- Past calls show separate VP and panelist stars or **Not rated**. The eligible VP
+  and selected panelist can use **Rate meeting** below the call to submit three
+  1–10 answers and optional improvement suggestions. Stars are calculated by the backend.
+- A notification bell beside **Sign out** shows the VP/panelist's outstanding call
+  ratings from `GET /api/meetings/rating-notifications`. Opening a reminder uses
+  the same questionnaire as the meeting button. It refreshes every minute, on focus,
+  and after submission. `POST /api/meetings/:meetingId/ratings` records one final
+  rating per participant role. See the [rating contract](../backend/docs/meeting-ratings.md).
 - Panelist and Reviewer pages also load the welcome messages returned by
   `GET /api/dashboards/:role`. See the [company submission contract](../backend/docs/company-submissions.md).
 
@@ -82,6 +90,7 @@ contain 8–128 characters. Email delivery depends on the backend's SMTP configu
 - `npm run lint`: ESLint checks.
 - `npm run preview`: serve an existing production build locally on port 5174.
   Keep the backend running too; this is not a production hosting server.
-- In `backend`, `npm test` or `npm run test:meetings` exercises the workflow against
-  real MongoDB and local Zoom/SMTP stand-ins. The separate `test:admin` suite is not included.
+- In `backend`, `npm test` exercises the workflow and ratings against real MongoDB;
+  scheduling uses local Zoom/SMTP stand-ins. `npm run test:meetings` runs the scheduling
+  suite only. The separate `test:admin` suite is not included.
 

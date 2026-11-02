@@ -70,7 +70,9 @@ async function allowedCustomer(vpId: string, customerId: string) {
 async function deliver(meeting: HydratedDocument<IMeeting>, actor: Actor) {
   try {
     const accepted = await sendMeetingInvitation(meeting);
-    meeting.invitedEmails = [...new Set([...(meeting.invitedEmails ?? []), ...accepted])];
+    meeting.invitedEmails = [
+      ...new Set([...(meeting.invitedEmails ?? []), ...accepted]),
+    ];
     meeting.emailStatus = "sent";
     meeting.emailSentAt = new Date();
     meeting.emailError = undefined;
@@ -82,7 +84,9 @@ async function deliver(meeting: HydratedDocument<IMeeting>, actor: Actor) {
     );
   } catch (error) {
     if (error instanceof MeetingMailError) {
-      meeting.invitedEmails = [...new Set([...(meeting.invitedEmails ?? []), ...error.acceptedEmails])];
+      meeting.invitedEmails = [
+        ...new Set([...(meeting.invitedEmails ?? []), ...error.acceptedEmails]),
+      ];
     }
     meeting.emailStatus = "failed";
     meeting.emailError =
@@ -174,17 +178,39 @@ export const scheduleMeeting = async (
       replyExisting(existing);
       return;
     }
-    const submission = await CompanySubmission.findOne({ customer: customer._id, status: "reviewed" });
+    const submission = await CompanySubmission.findOne({
+      customer: customer._id,
+      status: "reviewed",
+    });
     if (!submission) {
-      res.status(409).json({ success: false, message: "The customer's company review must be completed before scheduling a panelist call." });
+      res
+        .status(409)
+        .json({
+          success: false,
+          message:
+            "The customer's company review must be completed before scheduling a panelist call.",
+        });
       return;
     }
     const panelistRole = await Role.findOne({ name: "panelist" });
-    const panelist = panelistRole ? await User.findOne({
-      _id: input.panelistId, status: "active", roles: panelistRole._id,
-    }) : null;
-    if (!panelist || panelist.id === req.userId || panelist.id === customer.id) {
-      res.status(400).json({ success: false, message: "Select an active panelist other than the VP or customer." });
+    const panelist = panelistRole
+      ? await User.findOne({
+          _id: input.panelistId,
+          status: "active",
+          roles: panelistRole._id,
+        })
+      : null;
+    if (
+      !panelist ||
+      panelist.id === req.userId ||
+      panelist.id === customer.id
+    ) {
+      res
+        .status(400)
+        .json({
+          success: false,
+          message: "Select an active panelist other than the VP or customer.",
+        });
       return;
     }
     if (startTime.getTime() <= Date.now()) {
@@ -328,7 +354,8 @@ export const getMeetingCustomers = async (
     );
     const role = await Role.findOne({ name: "customer" });
     const reviewed = await CompanySubmission.find({
-      customer: { $in: assignments.map((entry) => entry.customer) }, status: "reviewed",
+      customer: { $in: assignments.map((entry) => entry.customer) },
+      status: "reviewed",
     }).select("customer");
     const customers = role
       ? await User.find({
@@ -347,90 +374,171 @@ export const getMeetingCustomers = async (
   }
 };
 
-export const getMeetingPanelists = async (req: AuthRequest, res: Response): Promise<void> => {
-  const parsed = z.object({ customerId: z.string().refine(isObjectIdOrHexString) }).strict().safeParse(req.query);
+export const getMeetingPanelists = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  const parsed = z
+    .object({ customerId: z.string().refine(isObjectIdOrHexString) })
+    .strict()
+    .safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ success: false, message: "Provide a valid customer ID." });
+    res
+      .status(400)
+      .json({ success: false, message: "Provide a valid customer ID." });
     return;
   }
   try {
     const customer = await allowedCustomer(req.userId!, parsed.data.customerId);
     if (!customer) {
-      res.status(403).json({ success: false, message: "You do not have access to this customer." });
+      res
+        .status(403)
+        .json({
+          success: false,
+          message: "You do not have access to this customer.",
+        });
       return;
     }
-    if (!(await CompanySubmission.exists({ customer: customer._id, status: "reviewed" }))) {
-      res.status(409).json({ success: false, message: "The customer's company review is not complete." });
+    if (
+      !(await CompanySubmission.exists({
+        customer: customer._id,
+        status: "reviewed",
+      }))
+    ) {
+      res
+        .status(409)
+        .json({
+          success: false,
+          message: "The customer's company review is not complete.",
+        });
       return;
     }
     const role = await Role.findOne({ name: "panelist" });
-    const data = role ? await User.find({
-      roles: role._id, status: "active", _id: { $nin: [req.userId, customer._id] },
-    }).select("_id fullName email").sort({ fullName: 1, _id: 1 }) : [];
+    const data = role
+      ? await User.find({
+          roles: role._id,
+          status: "active",
+          _id: { $nin: [req.userId, customer._id] },
+        })
+          .select("_id fullName email")
+          .sort({ fullName: 1, _id: 1 })
+      : [];
     res.json({ success: true, data });
   } catch {
-    res.status(500).json({ success: false, message: "Unable to load panelists." });
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to load panelists." });
   }
 };
 
 type MeetingScope = "admin" | "vp" | "customer" | "panelist" | "reviewer";
 
-async function listMeetings(req: AuthRequest, res: Response, scope: MeetingScope): Promise<void> {
-  const parsed = z.object({
-    page: z.coerce.number().int().min(1).max(100000).default(1),
-    view: z.enum(["all", "upcoming", "past"]).default(scope === "admin" ? "all" : "upcoming"),
-  }).strict().safeParse(req.query);
+async function listMeetings(
+  req: AuthRequest,
+  res: Response,
+  scope: MeetingScope,
+): Promise<void> {
+  const parsed = z
+    .object({
+      page: z.coerce.number().int().min(1).max(100000).default(1),
+      view: z
+        .enum(["all", "upcoming", "past"])
+        .default(scope === "admin" ? "all" : "upcoming"),
+    })
+    .strict()
+    .safeParse(req.query);
   if (!parsed.success || (scope !== "admin" && parsed.data.view === "all")) {
-    res.status(400).json({ success: false, message: "Provide a valid page and meeting view." });
+    res
+      .status(400)
+      .json({
+        success: false,
+        message: "Provide a valid page and meeting view.",
+      });
     return;
   }
   try {
     const { page, view } = parsed.data;
     const admin = scope === "admin";
-    const participant = scope === "customer" || scope === "panelist" || scope === "reviewer";
+    const participant =
+      scope === "customer" || scope === "panelist" || scope === "reviewer";
     const filter: QueryFilter<IMeeting> = {};
     if (scope === "vp") filter.createdBy = req.userId;
     if (scope === "customer") filter.customerId = req.userId;
     if (scope === "panelist") filter.panelistId = req.userId;
     if (scope === "reviewer") {
-      const submissions = await CompanySubmission.find({ reviewer: req.userId }).select("customer");
-      filter.customerId = { $in: submissions.map((submission) => submission.customer) };
+      const submissions = await CompanySubmission.find({
+        reviewer: req.userId,
+      }).select("customer");
+      filter.customerId = {
+        $in: submissions.map((submission) => submission.customer),
+      };
     }
     if (view !== "all") {
-      const endTime = { $add: ["$startTime", { $multiply: ["$duration", 60000] }] };
+      const endTime = {
+        $add: ["$startTime", { $multiply: ["$duration", 60000] }],
+      };
       filter.status = "scheduled";
-      filter.$expr = view === "past" ? { $lte: [endTime, new Date()] } : { $gt: [endTime, new Date()] };
+      filter.$expr =
+        view === "past"
+          ? { $lte: [endTime, new Date()] }
+          : { $gt: [endTime, new Date()] };
     }
     const limit = 25;
-    const query = Meeting.find(filter).sort(view === "all" ? { createdAt: -1, _id: -1 } : { startTime: view === "past" ? -1 : 1, _id: 1 })
-      .skip((page - 1) * limit).limit(limit);
+    const query = Meeting.find(filter)
+      .sort(
+        view === "all"
+          ? { createdAt: -1, _id: -1 }
+          : { startTime: view === "past" ? -1 : 1, _id: 1 },
+      )
+      .skip((page - 1) * limit)
+      .limit(limit);
     if (participant) {
-      query.select(`_id topic startTime timezone duration status zoomMeetingId creatorName creatorEmail customerName customerEmail panelistName panelistEmail createdAt${scope === "reviewer" ? "" : " joinUrl"}`);
+      const ratings =
+        scope === "panelist"
+          ? "vpRating panelistRating"
+          : "vpRating.stars vpRating.submittedAt panelistRating.stars panelistRating.submittedAt";
+      query.select(
+        `_id topic startTime timezone duration status zoomMeetingId creatorName creatorEmail customerName customerEmail panelistName panelistEmail createdAt ${ratings}${scope === "reviewer" ? "" : " joinUrl"}`,
+      );
     }
     const [meetings, total, requests] = await Promise.all([
       query,
       Meeting.countDocuments(filter),
       scope === "vp" && view === "upcoming"
-        ? Meeting.find({ createdBy: req.userId, status: { $ne: "scheduled" } }).sort({ createdAt: -1 }).limit(10)
+        ? Meeting.find({ createdBy: req.userId, status: { $ne: "scheduled" } })
+            .sort({ createdAt: -1 })
+            .limit(10)
         : [],
     ]);
     res.json({
       success: true,
-      data: meetings.map((meeting) => participant ? meeting.toObject() : publicMeeting(meeting, admin)),
-      ...(scope === "vp" ? { requests: requests.map((meeting) => publicMeeting(meeting)) } : {}),
-      page, total, totalPages: Math.max(1, Math.ceil(total / limit)),
+      data: meetings.map((meeting) =>
+        participant ? meeting.toObject() : publicMeeting(meeting, admin),
+      ),
+      ...(scope === "vp"
+        ? { requests: requests.map((meeting) => publicMeeting(meeting)) }
+        : {}),
+      page,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     });
   } catch {
-    res.status(500).json({ success: false, message: "Unable to load meetings." });
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to load meetings." });
   }
 }
 
 export const getMeetings = (req: AuthRequest, res: Response): Promise<void> =>
   listMeetings(req, res, req.baseUrl === "/api/admin" ? "admin" : "vp");
-export const getCustomerMeetings = (req: AuthRequest, res: Response): Promise<void> =>
-  listMeetings(req, res, "customer");
-export const getParticipantMeetings = (scope: "panelist" | "reviewer") =>
-  (req: AuthRequest, res: Response): Promise<void> => listMeetings(req, res, scope);
+export const getCustomerMeetings = (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => listMeetings(req, res, "customer");
+export const getParticipantMeetings =
+  (scope: "panelist" | "reviewer") =>
+  (req: AuthRequest, res: Response): Promise<void> =>
+    listMeetings(req, res, scope);
 
 export const retryMeetingEmail = async (
   req: AuthRequest,
@@ -485,12 +593,24 @@ export const retryMeetingEmail = async (
       });
       return;
     }
-    const panelistRole = meeting.panelistId ? await Role.findOne({ name: "panelist" }) : null;
-    const panelist = meeting.panelistId && panelistRole ? await User.findOne({
-      _id: meeting.panelistId, status: "active", roles: panelistRole._id,
-    }) : null;
+    const panelistRole = meeting.panelistId
+      ? await Role.findOne({ name: "panelist" })
+      : null;
+    const panelist =
+      meeting.panelistId && panelistRole
+        ? await User.findOne({
+            _id: meeting.panelistId,
+            status: "active",
+            roles: panelistRole._id,
+          })
+        : null;
     if (meeting.panelistId && !panelist) {
-      res.status(409).json({ success: false, message: "The selected panelist is no longer active." });
+      res
+        .status(409)
+        .json({
+          success: false,
+          message: "The selected panelist is no longer active.",
+        });
       return;
     }
     const actor = await User.findById(req.userId);
@@ -509,7 +629,9 @@ export const retryMeetingEmail = async (
           emailStatus: "sending",
           customerEmail: customer.email,
           customerName: customer.fullName,
-          ...(panelist ? { panelistName: panelist.fullName, panelistEmail: panelist.email } : {}),
+          ...(panelist
+            ? { panelistName: panelist.fullName, panelistEmail: panelist.email }
+            : {}),
         },
       },
       { returnDocument: "after" },

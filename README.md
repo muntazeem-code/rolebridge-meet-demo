@@ -5,8 +5,8 @@ A role-based company support and meeting dashboard built with React, TypeScript,
 - **Super Admin:** create users, assign roles and customers to VPs, and view company submissions, reviewer feedback, and meeting history.
 - **Customer:** submit a company profile with multiple support needs and view meeting links.
 - **Reviewer:** review automatically assigned company forms, send feedback, and view relevant meeting history.
-- **VP:** view assigned customers' completed reviews and schedule customer calls with a selected panelist.
-- **Panelist:** read completed company reviews and join the customer calls they are selected for.
+- **VP:** view assigned customers' completed reviews, schedule customer calls with a selected panelist, and rate completed calls.
+- **Panelist:** read completed company reviews, join their selected customer calls, and submit post-call ratings.
 
 ## Prerequisites
 
@@ -160,7 +160,8 @@ Open [http://localhost:5174](http://localhost:5174) and sign in using your `SEED
 6. Return to the admin dashboard and refresh submissions to see the form and feedback. Under **Customer access for VPs**, assign that customer to the VP and save.
 7. Sign in as the VP and refresh submissions. The VP can now see that customer's completed company review. Choose **Schedule Meeting**, select the reviewed customer and an active panelist, and enter the call details. Zoom credentials are required to create the meeting; SMTP invites the customer and panelist. Revoking the customer assignment removes VP access to the form and blocks new calls on subsequent requests.
 8. Sign in as the selected panelist to read the company form/feedback and view the call and joining link. Other panelists see the shared reviewed-form queue but cannot see this panelist's meetings.
-9. Use **Meeting view** in each dashboard to switch between upcoming/current and past calls. Calls move to past after their scheduled start plus duration, with lists refreshed every minute. The reviewer has a read-only history view for their customers; the admin sees all participants, invitation status, and activity logs. Ratings are planned for a later update.
+9. Use **Meeting view** in each dashboard to switch between upcoming/current and past calls. Calls move to past after their scheduled start plus duration, with lists refreshed every minute. The reviewer has a read-only history view for their customers; the admin sees all participants, invitation status, and activity logs.
+10. After the scheduled call ends, its VP and selected panelist each choose **Rate meeting** below the meeting, or open a pending reminder using the bell beside **Sign out**. Answer the three 1–10 questions and optionally suggest improvements. The server converts the scores into a 1–5 star rating. Each role submits once; **VP rating** and **Panelist rating** show **Not rated** independently until submitted. Reminders disappear after that participant submits, while the other participant's reminder remains pending. The admin can view both sets of answers and comments.
 
 Use separate browser profiles/private windows to check several accounts at once, or sign out between accounts. Use each section's **Refresh** button to pick up changes made in another session. Customers see their submission and review status; reviewer comments are visible to the admin, assigned reviewer, panelists, and assigned VPs after review completion.
 
@@ -192,7 +193,7 @@ npm run lint
 
 The backend build goes to `backend/dist`; the frontend build goes to `frontend/dist`. To run the compiled backend, use `npm start` from `backend`. To preview the frontend build locally, use `npm run preview` from `frontend` and open port 5174. `preview` is a local check, not a production hosting server. The backend still needs MongoDB and its environment configuration.
 
-From `backend`, run `npm test` or `npm run test:meetings` for the panelist workflow integration suite. It requires the configured MongoDB server and creates an isolated test database with fixture accounts. Real HTTP requests exercise review handoff, scheduling, role permissions, upcoming/past history, and email retries against local Zoom HTTP and SMTP stand-ins. No real Zoom meetings or customer emails are created. `npm run test:admin` still references a separate admin-user suite that is not included in this checkout.
+From `backend`, run `npm test` for the panelist workflow and rating integration suites, or `npm run test:meetings` for the scheduling workflow only. Tests require the configured MongoDB server and create isolated test databases with fixture accounts. Real HTTP requests exercise review handoff, scheduling, role permissions, upcoming/past history, email retries, rating eligibility, independent scores, and reminder counts. Scheduling uses local Zoom HTTP and SMTP stand-ins; rating tests call neither provider. No real Zoom meetings or customer emails are created. `npm run test:admin` still references a separate admin-user suite that is not included in this checkout.
 
 ## Troubleshooting
 
@@ -211,6 +212,7 @@ From `backend`, run `npm test` or `npm run test:meetings` for the panelist workf
 | No active reviewer available | Create/activate a reviewer account before submitting a company profile. |
 | VP sees no customer form | Save the customer-to-VP assignment in the admin dashboard, ensure the reviewer has completed the company review, then refresh the VP section. |
 | Panelist sees no form or meeting | Forms appear after review completion. A meeting appears only for the specific panelist selected by the VP. Refresh the relevant section. |
+| Rate meeting button is missing | Ratings open after a scheduled call's start plus duration. Only the original scheduling VP and selected panelist can rate under their respective roles, once each. |
 | Invitation not received | With SMTP blank in development, use the terminal's `DEV invitation URL`. With SMTP configured, check the credentials/sender and delivery logs; there is no console fallback after a configured SMTP send fails. |
 | Zoom is not configured / authorization fails | Fill all four Zoom credentials and check app activation, host membership, and create-meeting permissions. |
 
@@ -220,4 +222,4 @@ Commit the `.env.example` templates so other developers can create their own env
 
 For a hosted deployment, set the real frontend origin in `CLIENT_URL`, build the frontend with the deployed API URL in `VITE_API_URL`, configure SPA fallback routing to `index.html`, and run the backend with `NODE_ENV=production` and real SMTP settings for invitations. Configure HTTPS and secrets through the hosting environment. There is no deployment automation included in this repository.
 
-More details: [backend notes](backend/README.md), [frontend notes](frontend/README.md), [company submission API contract](backend/docs/company-submissions.md), and [panelist and meeting history contract](backend/docs/panelist-meetings.md).
+More details: [backend notes](backend/README.md), [frontend notes](frontend/README.md), [company submission API contract](backend/docs/company-submissions.md), [panelist and meeting history contract](backend/docs/panelist-meetings.md), and [rating and notification contract](backend/docs/meeting-ratings.md).

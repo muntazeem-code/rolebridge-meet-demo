@@ -43,4 +43,4 @@ Past means the scheduled start plus duration is at or before the server's curren
 | `GET /api/meetings/panelist` | Panelist: only meetings where this account is the selected panelist. |
 | `GET /api/meetings/reviewer` | Reviewer: scheduled meetings for company forms assigned to this reviewer. This read-only oversight view excludes join links. |
 
-Customer/panelist/reviewer responses exclude internal request IDs, email error details, recipient tracking, and logs. Panelist and customer responses include the participant link and VP/customer/panelist names. Ratings remain outside this update.
+Customer/panelist/reviewer responses exclude internal request IDs, email error details, recipient tracking, and logs. Panelist and customer responses include the participant link and VP/customer/panelist names. Separate VP/panelist rating summaries are included in all scoped meeting lists. See [post-call ratings and reminders](meeting-ratings.md) for the questionnaire, scoring, detailed-feedback visibility, and notification endpoints.

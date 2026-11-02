@@ -51,6 +51,19 @@ See the [company submission contract](docs/company-submissions.md) for endpoint 
 The full [panelist and meeting history contract](docs/panelist-meetings.md) describes
 the shared review queue, panelist selection, time boundaries, and read-only reviewer history.
 
+### Post-call ratings
+
+The original VP and selected panelist each rate a scheduled call once after its
+scheduled end. Three integer answers (overall call, venture preparedness, and next
+steps clarity) from 1 to 10 produce a server-calculated 1–5 star score. Optional
+suggestions are stored separately. Each participant has an independent rating;
+missing ratings remain **Not rated**. The admin sees both questionnaires and comments.
+
+`POST /api/meetings/:meetingId/ratings` atomically saves a participant's rating.
+`GET /api/meetings/rating-notifications` lists that account's pending reminders.
+No email or Zoom request is needed for rating. See the
+[rating API contract](docs/meeting-ratings.md) for validation, scoring, and permissions.
+
 ### Zoom setup
 
 Use an activated **Server-to-Server OAuth** app:
@@ -153,13 +166,18 @@ and 500/503 persistence or completion failure.
 
 ## Verification
 
-`npm run build` checks TypeScript and compiles the backend. `npm test` or
-`npm run test:meetings` builds and runs the panelist workflow integration suite.
+`npm run build` checks TypeScript and compiles the backend. `npm test` builds and
+runs the panelist workflow and rating integration suites. `npm run test:meetings`
+runs the scheduling workflow only. After a build, `node --test tests/meeting-ratings.test.mjs`
+runs the rating suite without any Zoom/SMTP calls.
 Set `MONGO_URI`; tests use a uniquely named database and remove their fixture records.
 The real HTTP/authentication/model code, Zoom fetch client, and Nodemailer client
 run against local Zoom HTTP and SMTP protocol stand-ins. Tests cover the review
 handoff, permissions, panelist selection, attribution, role-scoped history,
 in-progress/past boundaries, partial SMTP failures/retries, and Zoom denial/timeouts.
+The rating suite additionally checks independent scores, rating boundaries and
+validation, duplicate/concurrent writes, reminder pagination and role scope,
+detailed feedback visibility, and historical participant eligibility.
 
 The HTTP stand-in models the OAuth and meeting response shapes used by the existing
 Zoom client. Postman CLI was unavailable, so these tests run the local stand-ins

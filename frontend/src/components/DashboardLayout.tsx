@@ -1,6 +1,7 @@
 ﻿import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
+import RatingNotifications from "./RatingNotifications";
 import type { User } from "../types/auth";
 
 export default function DashboardLayout({
@@ -32,6 +33,9 @@ export default function DashboardLayout({
         </div>
         {!user.roles.some((role) => role.name === "customer") && (
           <WorkspaceSwitcher roles={user.roles} />
+        )}
+        {user.roles.some((role) => role.name === "vp" || role.name === "panelist") && (
+          <RatingNotifications />
         )}
         <button
           type="button"
