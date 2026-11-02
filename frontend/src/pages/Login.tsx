@@ -31,7 +31,10 @@ export default function Login() {
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
-      <h1>Sign in</h1>
+      <div className="space-y-2">
+        <h1 className="m-0">Sign in</h1>
+        <p className="m-0">Access your workspace and manage your account.</p>
+      </div>
       <label>
         Email
         <input

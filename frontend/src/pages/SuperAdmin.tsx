@@ -109,24 +109,26 @@ export default function SuperAdmin() {
     <>
       <form onSubmit={handleSubmit}>
         <h1>Create user</h1>
-        <label>
-          Full name
-          <input
-            value={fullName}
-            minLength={2}
-            onChange={(event) => setFullName(event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Email address
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label>
+            Full name
+            <input
+              value={fullName}
+              minLength={2}
+              onChange={(event) => setFullName(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Email address
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+        </div>
         <fieldset disabled={loading || submitting || !!loadError}>
           <legend>Assign roles</legend>
           {availableRoles.map(
@@ -216,12 +218,33 @@ export default function SuperAdmin() {
                 <tr key={user._id}>
                   <td>{user.fullName}</td>
                   <td>{user.email}</td>
-                  <td>{user.roles.map((role) => role.label).join(", ")}</td>
                   <td>
-                    {user.status}
-                    {user.mustChangePassword
-                      ? " (password change required)"
-                      : ""}
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.roles.map((role) => (
+                        <span
+                          key={role._id}
+                          className="inline-flex rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-100"
+                        >
+                          {role.label}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
+                        user.status === "active"
+                          ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                          : user.status === "pending"
+                            ? "bg-amber-50 text-amber-800 ring-amber-200"
+                            : "bg-slate-100 text-slate-600 ring-slate-200"
+                      }`}
+                    >
+                      {user.status}
+                    </span>
+                    {user.mustChangePassword && (
+                      <small>Password change required</small>
+                    )}
                   </td>
                   <td>
                     <button

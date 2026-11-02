@@ -8,7 +8,7 @@ export default function WorkspaceSwitcher({ roles }: { roles: Role[] }) {
     roles.find((role) => pathname === role.dashboardPath)?.dashboardPath ?? "";
 
   return (
-    <label>
+    <label className="min-w-0 flex-1 text-xs text-slate-500 sm:w-56 sm:flex-none">
       My workspaces
       <select value={active} onChange={(event) => navigate(event.target.value)}>
         <option value="" disabled>

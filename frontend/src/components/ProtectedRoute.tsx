@@ -38,7 +38,12 @@ export default function ProtectedRoute({
   }, []);
 
   if (!sessionStorage.getItem("token")) return <Navigate to="/login" replace />;
-  if (loading) return <p role="status">Checking access...</p>;
+  if (loading)
+    return (
+      <p className="mx-4 mt-8 sm:mx-6" role="status">
+        Checking access...
+      </p>
+    );
   if (error)
     return (
       <main>
