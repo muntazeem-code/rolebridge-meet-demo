@@ -21,4 +21,4 @@ All paths are under `/api/company-submissions`, require a bearer token for an ac
 
 ## Local verification
 
-Run `npm run build` and `node --test tests/company-submissions.test.mjs` from `backend` with `MONGO_URI` configured. The integration test uses a uniquely named database, real HTTP/authentication and MongoDB, and fixture accounts; it never sends mail or calls Zoom.
+Run `npm run build` from `backend` to check TypeScript. The previously referenced `tests/company-submissions.test.mjs` is not included in this checkout. Until the integration suite is added, use the [manual workflow](../../README.md#6-try-the-complete-workflow) to verify customer submission, reviewer feedback, admin visibility, and VP assignment/revocation.
