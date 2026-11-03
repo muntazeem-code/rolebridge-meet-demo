@@ -1,6 +1,13 @@
 import { Fragment, useEffect, useState } from "react";
 import { api, getApiError } from "../services/api";
-import { meetingTime, meetingPhase, type Meeting, type MeetingPage, type MeetingView, type RatingSubmission } from "../types/meeting";
+import {
+  meetingTime,
+  meetingPhase,
+  type Meeting,
+  type MeetingPage,
+  type MeetingView,
+  type RatingSubmission,
+} from "../types/meeting";
 import { RATING_SUBMITTED_EVENT } from "../services/meeting-ratings";
 import MeetingRatings from "./MeetingRatings";
 
@@ -43,12 +50,22 @@ export default function MeetingList({
   }, []);
   useEffect(() => {
     const rated = (event: Event) => {
-      const { meetingId, role, rating } = (event as CustomEvent<RatingSubmission>).detail;
+      const { meetingId, role, rating } = (
+        event as CustomEvent<RatingSubmission>
+      ).detail;
       const field = role === "vp" ? "vpRating" : "panelistRating";
-      setResult((previous) => previous ? {
-        ...previous,
-        data: previous.data.map((meeting) => meeting._id === meetingId ? { ...meeting, [field]: rating } : meeting),
-      } : previous);
+      setResult((previous) =>
+        previous
+          ? {
+              ...previous,
+              data: previous.data.map((meeting) =>
+                meeting._id === meetingId
+                  ? { ...meeting, [field]: rating }
+                  : meeting,
+              ),
+            }
+          : previous,
+      );
       setMessage("Your meeting rating has been submitted.");
       setReload((value) => value + 1);
     };
@@ -58,9 +75,18 @@ export default function MeetingList({
   useEffect(() => {
     let active = true;
     api
-      .get<MeetingPage>(admin ? "/admin/meetings" : scope === "vp" ? "/meetings" : scope === "customer" ? "/meetings/mine" : `/meetings/${scope}`, {
-        params: { page, view },
-      })
+      .get<MeetingPage>(
+        admin
+          ? "/admin/meetings"
+          : scope === "vp"
+            ? "/meetings"
+            : scope === "customer"
+              ? "/meetings/mine"
+              : `/meetings/${scope}`,
+        {
+          params: { page, view },
+        },
+      )
       .then(({ data }) => {
         if (active) {
           setResult(data);
@@ -114,8 +140,13 @@ export default function MeetingList({
   const rows = result?.data ?? [];
   const readOnly = !admin && scope !== "vp";
   const showCreator = admin || scope !== "vp";
-  const columns = 7 + (showCreator ? 1 : 0) + (readOnly ? 0 : 1) + (admin ? 1 : 0);
-  const requests = !admin && scope === "vp" && view === "upcoming" ? (result?.requests ?? []) : [];
+  const showRatings = admin || scope !== "customer";
+  const columns =
+    7 + (showCreator ? 1 : 0) + (readOnly ? 0 : 1) + (admin ? 1 : 0);
+  const requests =
+    !admin && scope === "vp" && view === "upcoming"
+      ? (result?.requests ?? [])
+      : [];
   return (
     <section>
       <div className="section-heading">
@@ -129,17 +160,29 @@ export default function MeetingList({
         </button>
       </div>
       {admin && (
-        <p>View the VP, customer, selected panelist, and each meeting's Zoom and email activity.</p>
+        <p>
+          View the VP, customer, selected panelist, and each meeting's Zoom and
+          email activity.
+        </p>
       )}
-      {scope === "reviewer" && !admin && <p>Meeting history for the company forms assigned to you. This is a read-only oversight view.</p>}
+      {scope === "reviewer" && !admin && (
+        <p>
+          Meeting history for the company forms assigned to you. This is a
+          read-only oversight view.
+        </p>
+      )}
       <label className="mb-4 max-w-sm">
         Meeting view
-        <select value={view} disabled={loading || !!retrying} onChange={(event) => {
-          setLoading(true);
-          setResult(null);
-          setPage(1);
-          setView(event.target.value as MeetingView);
-        }}>
+        <select
+          value={view}
+          disabled={loading || !!retrying}
+          onChange={(event) => {
+            setLoading(true);
+            setResult(null);
+            setPage(1);
+            setView(event.target.value as MeetingView);
+          }}
+        >
           {admin && <option value="all">All meetings and requests</option>}
           <option value="upcoming">Upcoming and current meetings</option>
           <option value="past">Past meetings</option>
@@ -148,183 +191,228 @@ export default function MeetingList({
       {loading && <p role="status">Loading meetings...</p>}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
-      {!loading && !error && <>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Topic</th>
-              <th>Customer</th>
-              <th>Panelist</th>
-              {showCreator && <th>Scheduled by</th>}
-              <th>Meeting time</th>
-              <th>Duration</th>
-              <th>Status</th>
-              {!readOnly && <th>Invitations</th>}
-              <th>Actions</th>
-              {admin && <th>Logs</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((meeting) => (
-              <Fragment key={meeting._id}>
-              <tr>
-                <td>
-                  {meeting.topic}
-                  {meeting.zoomMeetingId && (
-                    <small>Zoom ID: {meeting.zoomMeetingId}</small>
-                  )}
-                </td>
-                <td>
-                  {meeting.customerName}
-                  <small>{meeting.customerEmail}</small>
-                </td>
-                <td>
-                  {meeting.panelistName ?? "Not assigned (older meeting)"}
-                  {meeting.panelistEmail && <small>{meeting.panelistEmail}</small>}
-                </td>
-                {showCreator && (
-                  <td>
-                    {meeting.creatorName}
-                    <small>{meeting.creatorEmail}</small>
-                    <small>
-                      Created {new Date(meeting.createdAt).toLocaleString()}
-                    </small>
-                  </td>
-                )}
-                <td>
-                  {meetingTime(meeting)}
-                  <small>{meeting.timezone}</small>
-                </td>
-                <td>{meeting.duration} min</td>
-                <td>{meetingPhase(meeting, checkedAt) ?? statuses[meeting.status]}</td>
-                {!readOnly && <td>
-                  {emailStatuses[meeting.emailStatus ?? "not_sent"]}
-                  {meeting.emailError && (
-                    <small className="error-text">{meeting.emailError}</small>
-                  )}
-                </td>}
-                <td>
-                  <div className="user-actions">
-                    {meeting.status === "scheduled" && meeting.joinUrl && (
-                      <a
-                        href={meeting.joinUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {meetingPhase(meeting, checkedAt) === "Past" ? "Meeting link" : "Join meeting"}
-                      </a>
-                    )}
-                    {!readOnly && meeting.status === "scheduled" &&
-                      ["failed", "not_sent"].includes(meeting.emailStatus ?? "not_sent") &&
-                      new Date(meeting.startTime).getTime() > checkedAt && (
-                        <button
-                          type="button"
-                          disabled={!!retrying}
-                          onClick={() => retryEmail(meeting)}
-                        >
-                          {retrying === meeting._id
-                            ? "Sending..."
-                            : "Retry Email"}
-                        </button>
-                      )}
-                    {scope === "reviewer" && !admin && <span className="text-xs text-slate-500">Read-only</span>}
-                  </div>
-                </td>
-                {admin && (
-                  <td>
-                    <details>
-                      <summary>View logs ({meeting.logs?.length ?? 0})</summary>
-                      <ol className="meeting-logs">
-                        {meeting.logs?.map((entry) => (
-                          <li key={entry._id}>
-                            <strong>{entry.event.replaceAll("_", " ")}</strong>
-                            <small>
-                              {new Date(entry.at).toLocaleString()} ·{" "}
-                              {entry.actorName} ({entry.actorEmail})
-                            </small>
-                            <p
-                              className={
-                                entry.level === "error" ? "error-text" : ""
-                              }
-                            >
-                              {entry.message}
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    </details>
-                  </td>
-                )}
-              </tr>
-              {meeting.status === "scheduled" && (
+      {!loading && !error && (
+        <>
+          <div className="table-scroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={columns} className="bg-slate-50/70 pt-2 pb-5">
-                    <MeetingRatings meeting={meeting} now={checkedAt} role={!admin && (scope === "vp" || scope === "panelist") ? scope : undefined} />
-                  </td>
+                  <th>Topic</th>
+                  <th>Customer</th>
+                  <th>Panelist</th>
+                  {showCreator && <th>Scheduled by</th>}
+                  <th>Meeting time</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  {!readOnly && <th>Invitations</th>}
+                  <th>Actions</th>
+                  {admin && <th>Logs</th>}
                 </tr>
-              )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!loading && !error && !rows.length && (
-        <p>
-          {view === "past" ? "No past meetings found." : view === "all" ? "No meetings have been requested." : "No upcoming or current meetings found."}
-        </p>
-      )}
-      {!!requests.length && (
-        <div className="scheduling-requests">
-          <h3>Scheduling requests</h3>
-          <ul>
-            {requests.map((meeting) => (
-              <li key={meeting._id}>
-                {meeting.topic} · {meetingTime(meeting)} ({meeting.timezone}) ·{" "}
-                {statuses[meeting.status]}
-              </li>
-            ))}
-          </ul>
-          {requests.some(
-            (meeting) =>
-              meeting.status === "needs_review" ||
-              meeting.status === "creating",
-          ) && (
+              </thead>
+              <tbody>
+                {rows.map((meeting) => (
+                  <Fragment key={meeting._id}>
+                    <tr>
+                      <td>
+                        {meeting.topic}
+                        {meeting.zoomMeetingId && (
+                          <small>Zoom ID: {meeting.zoomMeetingId}</small>
+                        )}
+                      </td>
+                      <td>
+                        {meeting.customerName}
+                        <small>{meeting.customerEmail}</small>
+                      </td>
+                      <td>
+                        {meeting.panelistName ?? "Not assigned (older meeting)"}
+                        {meeting.panelistEmail && (
+                          <small>{meeting.panelistEmail}</small>
+                        )}
+                      </td>
+                      {showCreator && (
+                        <td>
+                          {meeting.creatorName}
+                          <small>{meeting.creatorEmail}</small>
+                          <small>
+                            Created{" "}
+                            {new Date(meeting.createdAt).toLocaleString()}
+                          </small>
+                        </td>
+                      )}
+                      <td>
+                        {meetingTime(meeting)}
+                        <small>{meeting.timezone}</small>
+                      </td>
+                      <td>{meeting.duration} min</td>
+                      <td>
+                        {meetingPhase(meeting, checkedAt) ??
+                          statuses[meeting.status]}
+                      </td>
+                      {!readOnly && (
+                        <td>
+                          {emailStatuses[meeting.emailStatus ?? "not_sent"]}
+                          {meeting.emailError && (
+                            <small className="error-text">
+                              {meeting.emailError}
+                            </small>
+                          )}
+                        </td>
+                      )}
+                      <td>
+                        <div className="user-actions">
+                          {meeting.status === "scheduled" &&
+                            meeting.joinUrl && (
+                              <a
+                                href={meeting.joinUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {meetingPhase(meeting, checkedAt) === "Past"
+                                  ? "Meeting link"
+                                  : "Join meeting"}
+                              </a>
+                            )}
+                          {!readOnly &&
+                            meeting.status === "scheduled" &&
+                            ["failed", "not_sent"].includes(
+                              meeting.emailStatus ?? "not_sent",
+                            ) &&
+                            new Date(meeting.startTime).getTime() >
+                              checkedAt && (
+                              <button
+                                type="button"
+                                disabled={!!retrying}
+                                onClick={() => retryEmail(meeting)}
+                              >
+                                {retrying === meeting._id
+                                  ? "Sending..."
+                                  : "Retry Email"}
+                              </button>
+                            )}
+                          {scope === "reviewer" && !admin && (
+                            <span className="text-xs text-slate-500">
+                              Read-only
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {admin && (
+                        <td>
+                          <details>
+                            <summary>
+                              View logs ({meeting.logs?.length ?? 0})
+                            </summary>
+                            <ol className="meeting-logs">
+                              {meeting.logs?.map((entry) => (
+                                <li key={entry._id}>
+                                  <strong>
+                                    {entry.event.replaceAll("_", " ")}
+                                  </strong>
+                                  <small>
+                                    {new Date(entry.at).toLocaleString()} ·{" "}
+                                    {entry.actorName} ({entry.actorEmail})
+                                  </small>
+                                  <p
+                                    className={
+                                      entry.level === "error"
+                                        ? "error-text"
+                                        : ""
+                                    }
+                                  >
+                                    {entry.message}
+                                  </p>
+                                </li>
+                              ))}
+                            </ol>
+                          </details>
+                        </td>
+                      )}
+                    </tr>
+                    {meeting.status === "scheduled" && showRatings && (
+                      <tr>
+                        <td
+                          colSpan={columns}
+                          className="bg-slate-50/70 pt-2 pb-5"
+                        >
+                          <MeetingRatings
+                            meeting={meeting}
+                            now={checkedAt}
+                            role={
+                              !admin && (scope === "vp" || scope === "panelist")
+                                ? scope
+                                : undefined
+                            }
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!loading && !error && !rows.length && (
             <p>
-              For requests still creating or needing review, contact the super
-              admin before creating another meeting.
+              {view === "past"
+                ? "No past meetings found."
+                : view === "all"
+                  ? "No meetings have been requested."
+                  : "No upcoming or current meetings found."}
             </p>
           )}
-        </div>
+          {!!requests.length && (
+            <div className="scheduling-requests">
+              <h3>Scheduling requests</h3>
+              <ul>
+                {requests.map((meeting) => (
+                  <li key={meeting._id}>
+                    {meeting.topic} · {meetingTime(meeting)} ({meeting.timezone}
+                    ) · {statuses[meeting.status]}
+                  </li>
+                ))}
+              </ul>
+              {requests.some(
+                (meeting) =>
+                  meeting.status === "needs_review" ||
+                  meeting.status === "creating",
+              ) && (
+                <p>
+                  For requests still creating or needing review, contact the
+                  super admin before creating another meeting.
+                </p>
+              )}
+            </div>
+          )}
+          {result && (
+            <div className="pagination">
+              <button
+                type="button"
+                disabled={page <= 1 || loading || !!retrying}
+                onClick={() => {
+                  setLoading(true);
+                  setPage((value) => value - 1);
+                }}
+              >
+                Previous
+              </button>
+              <span>
+                Page {result.page} of {result.totalPages} · {result.total}{" "}
+                records
+              </span>
+              <button
+                type="button"
+                disabled={page >= result.totalPages || loading || !!retrying}
+                onClick={() => {
+                  setLoading(true);
+                  setPage((value) => value + 1);
+                }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
-      {result && (
-        <div className="pagination">
-          <button
-            type="button"
-            disabled={page <= 1 || loading || !!retrying}
-            onClick={() => {
-              setLoading(true);
-              setPage((value) => value - 1);
-            }}
-          >
-            Previous
-          </button>
-          <span>
-            Page {result.page} of {result.totalPages} · {result.total} records
-          </span>
-          <button
-            type="button"
-            disabled={page >= result.totalPages || loading || !!retrying}
-            onClick={() => {
-              setLoading(true);
-              setPage((value) => value + 1);
-            }}
-          >
-            Next
-          </button>
-        </div>
-      )}
-      </>}
     </section>
   );
 }

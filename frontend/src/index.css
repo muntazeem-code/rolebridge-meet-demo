@@ -6,11 +6,11 @@
   }
 
   #root {
-    @apply mx-auto min-h-svh max-w-7xl;
+    @apply min-h-svh w-full min-w-0;
   }
 
   main {
-    @apply min-w-0 p-4 sm:p-6 lg:p-8;
+    @apply mx-auto w-full min-w-0 max-w-7xl p-4 sm:p-6 lg:p-8;
   }
 
   h1 {

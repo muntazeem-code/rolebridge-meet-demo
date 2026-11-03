@@ -69,7 +69,10 @@ export default function CustomerAssignments({
           Refresh assignments
         </button>
       </div>
-      <p>Assigned VPs can view the customer's company form and reviewer feedback, and schedule meetings with an active customer.</p>
+      <p>
+        Assigned VPs can view the customer's company form and reviewer feedback,
+        and schedule meetings with an active customer.
+      </p>
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
       <div className="table-scroll">
