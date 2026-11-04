@@ -195,10 +195,50 @@ The backend build goes to `backend/dist`; the frontend build goes to `frontend/d
 
 From `backend`, run `npm test` for the panelist workflow and rating integration suites, or `npm run test:meetings` for the scheduling workflow only. Tests require the configured MongoDB server and create isolated test databases with fixture accounts. Real HTTP requests exercise review handoff, scheduling, role permissions, upcoming/past history, email retries, rating eligibility, independent scores, and reminder counts. Scheduling uses local Zoom HTTP and SMTP stand-ins; rating tests call neither provider. No real Zoom meetings or customer emails are created. `npm run test:admin` still references a separate admin-user suite that is not included in this checkout.
 
+## Run or update the Docker frontend
+
+Docker serves the application at **http://localhost** (port 80). Its Nginx server
+forwards `/api/...` to the backend container on `backend:5001`. The backend port is
+internal to Docker; your browser must not call `http://localhost:5001` in this setup.
+The Vite development proxy is used only by `npm run dev`, not by Nginx.
+
+Compose explicitly builds the frontend with `VITE_API_URL=/api`. Changing source
+files or restarting an existing container does not rebuild the JavaScript already
+inside the image. After changing the frontend API URL, rebuild and recreate the
+frontend container from the repository root:
+
+```powershell
+# Keep an existing server environment-file override; use the local file otherwise.
+if (-not $env:BACKEND_ENV_FILE) { $env:BACKEND_ENV_FILE = "./backend/.env" }
+docker compose build frontend
+docker compose up -d --no-deps --force-recreate frontend
+```
+
+These commands replace only the frontend and leave the existing backend/database
+running. Open **http://localhost/login** and hard-refresh (`Ctrl+Shift+R`). The login
+request in the browser Network tab must be **http://localhost/api/auth/login**.
+If it still requests port 5001, you are loading an older frontend image or page.
+
+To check that Nginx can reach the backend without submitting credentials:
+
+```sh
+curl -i http://localhost/api/auth/me
+```
+
+An HTTP **401** response is expected without a token and confirms the API proxy is
+reachable. Connection refused means the public frontend port is not reachable;
+HTTP 502 indicates the proxy cannot reach the backend. Neither development terminal
+needs to be running after the Docker containers are up.
+
+The backend still needs its own reachable MongoDB configured in the selected
+environment file. In a container, `127.0.0.1` means that container, not the host.
+Use the database address appropriate to your Docker environment. Production user
+invitations also require SMTP and a `CLIENT_URL` matching the public frontend URL.
+
 ## Troubleshooting
 
 | Problem | What to check |
-| --- | --- |
+| ------- | ------------- |
 | `node` / `npm` is not recognized | Install Node.js with npm, then reopen the terminal so PATH is refreshed. |
 | PowerShell blocks `npm.ps1` | Use `npm.cmd` in place of `npm`, or run the commands in Command Prompt. |
 | Unsupported engine or Vite build error | Check `node --version`; use Node 24.x and reinstall dependencies with `npm ci` in each package. |
