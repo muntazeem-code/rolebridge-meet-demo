@@ -195,7 +195,59 @@ The backend build goes to `backend/dist`; the frontend build goes to `frontend/d
 
 From `backend`, run `npm test` for the panelist workflow and rating integration suites, or `npm run test:meetings` for the scheduling workflow only. Tests require the configured MongoDB server and create isolated test databases with fixture accounts. Real HTTP requests exercise review handoff, scheduling, role permissions, upcoming/past history, email retries, rating eligibility, independent scores, and reminder counts. Scheduling uses local Zoom HTTP and SMTP stand-ins; rating tests call neither provider. No real Zoom meetings or customer emails are created. `npm run test:admin` still references a separate admin-user suite that is not included in this checkout.
 
-## Run or update the Docker frontend
+## Run the project with Docker
+
+Start Docker Desktop with Linux containers enabled. Run the following commands
+from the repository root, where `compose.yaml` is located.
+
+1. Create `backend/.env` from `backend/.env.example` if it does not already exist.
+   Keep an existing configured file and database. Set `MONGO_URI` and a nonempty,
+   randomly generated `JWT_SECRET`; supply SMTP/Zoom credentials for those features.
+2. Check the database address. Compose runs the frontend and backend, but **does
+   not start MongoDB**. An existing Atlas/remote URI can stay as it is. For MongoDB
+   running on your Windows Docker Desktop host, use
+   `mongodb://host.docker.internal:27017/roles_dashboard` and ensure that MongoDB
+   accepts connections from Docker. `localhost` or `127.0.0.1` inside the backend
+   container refers to that container.
+3. Optionally copy the root `.env.example` to `.env` to customize Compose settings.
+   By default it reads `./backend/.env`, publishes port `80`, and sets the backend's
+   `CLIENT_URL` to `http://localhost`. For another port, set both `HTTP_PORT=8080`
+   and `CLIENT_URL=http://localhost:8080`. Shell variables override root `.env`
+   values. On a server, set `CLIENT_URL` to the real public frontend origin and
+   `BACKEND_ENV_FILE` to the server's environment-file path if needed. These
+   Compose values take precedence over `CLIENT_URL` in `backend/.env`.
+
+```powershell
+docker compose config --quiet
+docker compose up -d --build --wait
+docker compose ps
+docker compose exec frontend nginx -t
+```
+
+Open **http://localhost/login**. For a new database only, populate the roles and
+initial admin after setting `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in the
+backend environment file:
+
+```powershell
+docker compose run --rm backend node dist/scripts/seed.js
+```
+
+This runs the compiled seed already included in the backend image. Reseeding does
+not reset an existing admin password. Neither local `npm run dev` terminal needs
+to run while the containers are running. No frontend `.env` file is needed.
+
+Check the API and inspect startup errors with:
+
+```powershell
+curl.exe -i http://localhost/api/health
+docker compose logs --tail=100 backend frontend
+```
+
+`/api/health` should return HTTP 200. If startup times out waiting for the backend,
+inspect its logs and check MongoDB connectivity. To stop the application, use
+`docker compose down`; the externally configured database is not removed.
+
+### Update the Docker frontend
 
 Docker serves the application at **http://localhost** (port 80). Its Nginx server
 forwards `/api/...` to the backend container on `backend:5001`. The backend port is
@@ -208,8 +260,6 @@ inside the image. After changing the frontend API URL, rebuild and recreate the
 frontend container from the repository root:
 
 ```powershell
-# Keep an existing server environment-file override; use the local file otherwise.
-if (-not $env:BACKEND_ENV_FILE) { $env:BACKEND_ENV_FILE = "./backend/.env" }
 docker compose build frontend
 docker compose up -d --no-deps --force-recreate frontend
 ```
@@ -234,6 +284,8 @@ The backend still needs its own reachable MongoDB configured in the selected
 environment file. In a container, `127.0.0.1` means that container, not the host.
 Use the database address appropriate to your Docker environment. Production user
 invitations also require SMTP and a `CLIENT_URL` matching the public frontend URL.
+Nginx uses Docker's embedded DNS to refresh the backend address if its container
+is recreated.
 
 ## Troubleshooting
 

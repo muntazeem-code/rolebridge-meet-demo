@@ -498,7 +498,7 @@ async function listMeetings(
           ? "vpRating panelistRating"
           : "vpRating.stars vpRating.submittedAt panelistRating.stars panelistRating.submittedAt";
       query.select(
-        `_id topic startTime timezone duration status zoomMeetingId creatorName creatorEmail customerName customerEmail panelistName panelistEmail createdAt ${ratings}${scope === "reviewer" ? "" : " joinUrl"}`,
+        `_id topic startTime timezone duration status zoomMeetingId creatorName creatorEmail customerName customerEmail panelistName panelistEmail createdAt ${ratings}${scope === "panelist" ? " panelistId" : ""}${scope === "reviewer" ? "" : " joinUrl"}`,
       );
     }
     const [meetings, total, requests] = await Promise.all([
@@ -512,9 +512,19 @@ async function listMeetings(
     ]);
     res.json({
       success: true,
-      data: meetings.map((meeting) =>
-        participant ? meeting.toObject() : publicMeeting(meeting, admin),
-      ),
+      data: meetings.map((meeting) => ({
+        ...(participant ? meeting.toObject() : publicMeeting(meeting, admin)),
+        ratingRole:
+          scope === "vp" &&
+          req.userRoles?.includes("vp") &&
+          meeting.createdBy?.toString() === req.userId
+            ? "vp"
+            : scope === "panelist" &&
+                req.userRoles?.includes("panelist") &&
+                meeting.panelistId?.toString() === req.userId
+              ? "panelist"
+              : null,
+      })),
       ...(scope === "vp"
         ? { requests: requests.map((meeting) => publicMeeting(meeting)) }
         : {}),

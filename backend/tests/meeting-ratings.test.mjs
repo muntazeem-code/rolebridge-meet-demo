@@ -62,6 +62,7 @@ test(
       const otherVp = await fixture("other-vp", ["vp"]);
       const panelist = await fixture("panelist", ["panelist"]);
       const otherPanelist = await fixture("other-panelist", ["panelist"]);
+      const outsider = await fixture("unassigned-dual-role", ["vp", "panelist"]);
       const customer = await fixture("customer", ["customer"]);
       const reviewer = await fixture("reviewer", ["reviewer"]);
       const disabled = await fixture("disabled", ["vp"], {
@@ -209,6 +210,77 @@ test(
             ).status,
             404,
           );
+        },
+      );
+
+      await t.test(
+        "meeting-specific ownership blocks other participants even for the same customer",
+        async () => {
+          for (const [call, actor, role] of [
+            [past, otherVp, "vp"],
+            [past, otherPanelist, "panelist"],
+            [past, outsider, "vp"],
+            [past, outsider, "panelist"],
+            [past, vp, "panelist"],
+            [dualPast, vp, "vp"],
+            [legacy, outsider, "panelist"],
+          ]) {
+            const response = await request(
+              ratePath(call),
+              "POST",
+              rating({ role }),
+              actor,
+            );
+            assert.equal(
+              response.status,
+              404,
+              `${actor.fullName} cannot rate ${call.topic} as ${role}`,
+            );
+          }
+          assert.equal(
+            (await request(reminders, "GET", undefined, outsider)).body.total,
+            0,
+          );
+          for (const path of ["/meetings", "/meetings/panelist"]) {
+            const response = await request(
+              `${path}?view=past`, "GET", undefined, outsider,
+            );
+            assert.equal(response.status, 200);
+            assert.equal(response.body.total, 0);
+          }
+          const saved = await Meeting.findById(past.id);
+          assert.equal(saved.vpRating, undefined);
+          assert.equal(saved.panelistRating, undefined);
+          assert.equal(saved.logs.length, 0);
+        },
+      );
+
+      await t.test(
+        "meeting lists explicitly grant rating controls only to that workspace's participant",
+        async () => {
+          for (const [path, actor, call, expected] of [
+            ["/meetings", vp, past, "vp"],
+            ["/meetings/panelist", panelist, past, "panelist"],
+            ["/meetings", otherVp, dualPast, "vp"],
+            ["/meetings/panelist", vp, dualPast, "panelist"],
+            ["/admin/meetings", admin, past, null],
+            ["/meetings/mine", customer, past, null],
+            ["/meetings/reviewer", reviewer, past, null],
+          ]) {
+            const response = await request(
+              `${path}?view=past`, "GET", undefined, actor,
+            );
+            assert.equal(response.status, 200);
+            const entry = response.body.data.find(
+              (meeting) => meeting._id === call.id,
+            );
+            assert.ok(entry, `${actor.fullName} can see ${call.topic}`);
+            assert.equal(
+              entry.ratingRole,
+              expected,
+              `${path} returns the meeting-specific rating role`,
+            );
+          }
         },
       );
 

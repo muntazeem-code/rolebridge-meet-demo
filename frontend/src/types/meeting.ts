@@ -22,6 +22,7 @@ export interface Meeting {
   invitedEmails?: string[];
   vpRating?: MeetingRating;
   panelistRating?: MeetingRating;
+  ratingRole?: RatingRole | null;
   requestId: string;
   topic: string;
   startTime: string;
