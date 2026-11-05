@@ -71,11 +71,12 @@ export default function MeetingRatings({
   now: number;
 }) {
   const [open, setOpen] = useState(false);
+  const ratingRole = role && meeting.ratingRole === role ? role : undefined;
   const past = meetingPhase(meeting, now) === "Past";
   const rated =
-    role === "vp"
+    ratingRole === "vp"
       ? meeting.vpRating
-      : role === "panelist"
+      : ratingRole === "panelist"
         ? meeting.panelistRating
         : undefined;
   return (
@@ -87,14 +88,14 @@ export default function MeetingRatings({
         <RatingSummary label="VP" rating={meeting.vpRating} />
         <RatingSummary label="Panelist" rating={meeting.panelistRating} />
       </div>
-      {role && past && !rated && (
+      {ratingRole && past && !rated && (
         <button type="button" onClick={() => setOpen(true)}>
           Rate meeting
         </button>
       )}
-      {role && past && rated && (
+      {ratingRole && past && rated && (
         <span className="text-xs font-medium text-emerald-700">
-          Your {role === "vp" ? "VP" : "panelist"} rating has been submitted.
+          Your {ratingRole === "vp" ? "VP" : "panelist"} rating has been submitted.
         </span>
       )}
       {!past && (
@@ -102,10 +103,10 @@ export default function MeetingRatings({
           Ratings become available after the scheduled call ends.
         </span>
       )}
-      {open && role && (
+      {open && ratingRole && (
         <MeetingRatingDialog
           meeting={meeting}
-          role={role}
+          role={ratingRole}
           onClose={() => setOpen(false)}
         />
       )}

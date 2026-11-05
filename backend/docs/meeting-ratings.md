@@ -32,6 +32,12 @@ Returns `{ success, data, page, total, totalPages }`. Entries contain `meetingId
 
 The frontend bell beside Sign out polls every minute and refreshes on focus, opening, and rating submission. It opens the same questionnaire as the **Rate meeting** button below a past meeting. Notifications do not send email or invoke Zoom.
 
+## Per-meeting rating controls
+
+Meeting-list responses include `ratingRole: "vp" | "panelist" | null` for the authenticated caller in the requested workspace. The VP workspace returns `"vp"` only when that account created the meeting; the panelist workspace returns `"panelist"` only when that account is its selected panelist. Admin, customer, and reviewer views return `null`. The frontend shows rating actions only when this server-provided role matches the active workspace, the scheduled call has ended, and that role has not rated yet. An absent eligibility value never enables a rating action.
+
+Having the VP/panelist role, receiving a company's completed review in the shared panelist queue, or being assigned to the same customer does not grant permission to rate its other meetings. Reminders and rating submissions remain independently restricted by the meeting's stored `createdBy` and `panelistId` identities. A user with both roles can rate only under the role they actually hold for that particular meeting.
+
 ## Visibility
 
 All existing role-scoped meeting lists return separate VP and panelist rating summaries, displaying stars or **Not rated**. Admin, creator VP, and selected panelist can also see questionnaire answers and comments on the meetings they can already access. Customer and reviewer lists include only each rating's stars and submission timestamp. No new access to other users' meetings is granted.

@@ -24,15 +24,22 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.get("/", (req, res) => {
-  console.log("Health check API called");
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Multi Dashboard Backend Running",
+  });
+});
 
+
+app.get("/api/health", (_req, res) => {
   res.status(200).json({
     success: true,
     message: "Multi Dashboard Backend Running",
     port: 5001,
   });
 });
+
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
