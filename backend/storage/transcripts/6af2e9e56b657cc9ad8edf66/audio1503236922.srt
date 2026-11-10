@@ -1,0 +1,12 @@
+1
+00:00:00,000 --> 00:00:12,800
+Yeah, this is testing and we have the zoom work place where we are handling these things
+
+2
+00:00:12,800 --> 00:00:16,840
+and this is only the one side view.
+
+3
+00:00:16,840 --> 00:00:26,720
+Let's see how we can do the testing from the customer's perspective.
+
