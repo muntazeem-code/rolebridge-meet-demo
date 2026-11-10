@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { authenticate } from "../middleware/authenticate.js";
 import { authorize } from "../middleware/authorize.js";
 import {
@@ -14,6 +14,7 @@ import {
   retryMeetingEmail,
   scheduleMeeting,
 } from "../controllers/meeting.controller.js";
+import { getMeetingTranscription } from "../controllers/transcription.controller.js";
 
 const router = Router();
 router.use(authenticate);
@@ -42,6 +43,7 @@ router.get(
 router.get("/mine", authorize("customer"), getCustomerMeetings);
 router.get("/", authorize("vp"), getMeetings);
 router.post("/", authorize("vp"), scheduleMeeting);
+router.get("/:meetingId/transcription", getMeetingTranscription);
 router.post(
   "/:meetingId/retry-email",
   authorize("vp", "super_admin"),
