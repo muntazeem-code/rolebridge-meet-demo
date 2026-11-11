@@ -93,7 +93,7 @@ export default function MeetingTranscript({
     }
   };
 
-  const handleDownload = async (format: "txt" | "srt" | "vtt" | "json") => {
+  const handleDownload = async (format: "txt" | "json" = "txt") => {
     if (!transcription) return;
     setDownloadingFormat(format);
     try {
@@ -281,7 +281,7 @@ export default function MeetingTranscript({
                 </button>
               </div>
 
-              <button
+              {/* <button
                 type="button"
                 onClick={handleCopy}
                 className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-50 hover:bg-slate-50 hover:text-slate-900"
@@ -298,7 +298,7 @@ export default function MeetingTranscript({
                     Copy
                   </>
                 )}
-              </button>
+              </button> */}
             </div>
           </div>
 

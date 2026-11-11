@@ -13,7 +13,7 @@ export async function fetchMeetingTranscription(
 
 export async function downloadTranscription(
   transcriptionId: string,
-  format: "txt" | "srt" | "vtt" | "json",
+  format: "txt" | "json" = "txt",
   defaultFileName?: string,
 ): Promise<void> {
   const response = await api.get(
