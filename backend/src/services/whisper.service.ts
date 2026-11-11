@@ -68,10 +68,10 @@ export interface TranscriptionJobResult {
   segments?: Array<{ id: number; start: number; end: number; text: string }>;
   outputFiles?: {
     txt?: string;
-    srt?: string;
-    vtt?: string;
+
+
     json?: string;
-    tsv?: string;
+
   };
   duration?: number;
   errorMessage?: string;
@@ -195,17 +195,25 @@ export async function runWhisperTranscription(
 
       const outputFiles: {
         txt?: string;
-        srt?: string;
-        vtt?: string;
+    
+    
         json?: string;
-        tsv?: string;
+    
       } = {};
 
       if (fs.existsSync(txtPath)) outputFiles.txt = txtPath;
-      if (fs.existsSync(srtPath)) outputFiles.srt = srtPath;
-      if (fs.existsSync(vttPath)) outputFiles.vtt = vttPath;
+
+
       if (fs.existsSync(jsonPath)) outputFiles.json = jsonPath;
-      if (fs.existsSync(tsvPath)) outputFiles.tsv = tsvPath;
+      for (const unwanted of [srtPath, vttPath, tsvPath]) {
+        if (fs.existsSync(unwanted)) {
+          try {
+            fs.unlinkSync(unwanted);
+          } catch {
+            // Ignore unlink errors
+          }
+        }
+      }
 
       let transcriptText = "";
       if (fs.existsSync(txtPath)) {

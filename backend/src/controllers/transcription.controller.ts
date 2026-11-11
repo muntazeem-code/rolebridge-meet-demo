@@ -157,7 +157,7 @@ export const getTranscriptionById = async (
 
 /**
  * GET /api/transcriptions/:transcriptionId/download/:format
- * Download transcript file in TXT, SRT, VTT, or JSON format.
+ * Download transcript file in TXT or JSON format.
  */
 export const downloadTranscriptionFormat = async (
   req: AuthRequest,
@@ -175,10 +175,10 @@ export const downloadTranscriptionFormat = async (
       ? req.params.format[0]
       : req.params.format;
     const normalizedFormat = (formatParam || "").toLowerCase();
-    if (!["txt", "srt", "vtt", "json"].includes(normalizedFormat)) {
+    if (!["txt", "json"].includes(normalizedFormat)) {
       res.status(400).json({
         success: false,
-        message: "Invalid download format. Supported formats are: txt, srt, vtt, json.",
+        message: "Invalid download format. Supported formats are: txt, json.",
       });
       return;
     }
@@ -262,44 +262,6 @@ export const downloadTranscriptionFormat = async (
           2,
         ),
       );
-      return;
-    }
-
-    if (normalizedFormat === "srt") {
-      // Build SRT format from segments
-      let srtContent = "";
-      transcription.segments.forEach((seg, index) => {
-        const formatTime = (secs: number) => {
-          const h = Math.floor(secs / 3600).toString().padStart(2, "0");
-          const m = Math.floor((secs % 3600) / 60).toString().padStart(2, "0");
-          const s = Math.floor(secs % 60).toString().padStart(2, "0");
-          const ms = Math.floor((secs % 1) * 1000).toString().padStart(3, "0");
-          return `${h}:${m}:${s},${ms}`;
-        };
-        srtContent += `${index + 1}\n${formatTime(seg.start)} --> ${formatTime(seg.end)}\n${seg.text}\n\n`;
-      });
-      res.setHeader("Content-Type", "application/x-subrip; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="${downloadFileName}"`);
-      res.send(srtContent);
-      return;
-    }
-
-    if (normalizedFormat === "vtt") {
-      // Build WebVTT format from segments
-      let vttContent = "WEBVTT\n\n";
-      transcription.segments.forEach((seg) => {
-        const formatTime = (secs: number) => {
-          const h = Math.floor(secs / 3600).toString().padStart(2, "0");
-          const m = Math.floor((secs % 3600) / 60).toString().padStart(2, "0");
-          const s = Math.floor(secs % 60).toString().padStart(2, "0");
-          const ms = Math.floor((secs % 1) * 1000).toString().padStart(3, "0");
-          return `${h}:${m}:${s}.${ms}`;
-        };
-        vttContent += `${formatTime(seg.start)} --> ${formatTime(seg.end)}\n${seg.text}\n\n`;
-      });
-      res.setHeader("Content-Type", "text/vtt; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="${downloadFileName}"`);
-      res.send(vttContent);
       return;
     }
 

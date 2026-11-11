@@ -9,12 +9,8 @@ export interface ITranscriptSegment {
 
 export interface ITranscriptionOutputFiles {
   txt?: string;
-  srt?: string;
-  vtt?: string;
   json?: string;
-  tsv?: string;
 }
-
 export interface ITranscription {
   meetingId: Types.ObjectId;
   originalFileName: string;
@@ -46,10 +42,7 @@ const segmentSchema = new Schema<ITranscriptSegment>(
 const outputFilesSchema = new Schema<ITranscriptionOutputFiles>(
   {
     txt: { type: String },
-    srt: { type: String },
-    vtt: { type: String },
     json: { type: String },
-    tsv: { type: String },
   },
   { _id: false },
 );

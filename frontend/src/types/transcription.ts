@@ -13,10 +13,7 @@ export interface TranscriptSegment {
 
 export interface TranscriptionOutputFiles {
   txt?: string;
-  srt?: string;
-  vtt?: string;
   json?: string;
-  tsv?: string;
 }
 
 export interface Transcription {
