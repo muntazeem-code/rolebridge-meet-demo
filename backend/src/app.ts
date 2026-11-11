@@ -6,6 +6,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import meetingRoutes from "./routes/meeting.routes.js";
 import companySubmissionRoutes from "./routes/company-submission.routes.js";
+import transcriptionRoutes from "./routes/transcription.routes.js";
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/dashboards", dashboardRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/company-submissions", companySubmissionRoutes);
+app.use("/api/transcriptions", transcriptionRoutes);
 
 app.use((req, res, next) => {
   console.log("===================-------------------------------");

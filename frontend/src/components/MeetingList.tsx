@@ -10,6 +10,7 @@ import {
 } from "../types/meeting";
 import { RATING_SUBMITTED_EVENT } from "../services/meeting-ratings";
 import MeetingRatings from "./MeetingRatings";
+import MeetingTranscript from "./MeetingTranscript";
 
 const statuses = {
   creating: "Creating",
@@ -141,6 +142,7 @@ export default function MeetingList({
   const readOnly = !admin && scope !== "vp";
   const showCreator = admin || scope !== "vp";
   const showRatings = admin || scope !== "customer";
+  const canViewTranscript = admin || scope === "vp" || scope === "panelist";
   const columns =
     7 + (showCreator ? 1 : 0) + (readOnly ? 0 : 1) + (admin ? 1 : 0);
   const requests =
@@ -328,21 +330,29 @@ export default function MeetingList({
                         </td>
                       )}
                     </tr>
-                    {meeting.status === "scheduled" && showRatings && (
+                    {meeting.status === "scheduled" && (showRatings || canViewTranscript) && (
                       <tr>
                         <td
                           colSpan={columns}
-                          className="bg-slate-50/70 pt-2 pb-5"
+                          className="bg-slate-50/70 p-4 space-y-4"
                         >
-                          <MeetingRatings
-                            meeting={meeting}
-                            now={checkedAt}
-                            role={
-                              !admin && (scope === "vp" || scope === "panelist")
-                                ? scope
-                                : undefined
-                            }
-                          />
+                          {showRatings && (
+                            <MeetingRatings
+                              meeting={meeting}
+                              now={checkedAt}
+                              role={
+                                !admin && (scope === "vp" || scope === "panelist")
+                                  ? scope
+                                  : undefined
+                              }
+                            />
+                          )}
+                          {canViewTranscript && (
+                            <MeetingTranscript
+                              meetingId={meeting._id}
+                              meetingTopic={meeting.topic}
+                            />
+                          )}
                         </td>
                       </tr>
                     )}
