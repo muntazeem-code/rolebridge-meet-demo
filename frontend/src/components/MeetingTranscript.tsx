@@ -281,10 +281,10 @@ export default function MeetingTranscript({
                 </button>
               </div>
 
-              {/* <button
+              <button
                 type="button"
                 onClick={handleCopy}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-50 hover:bg-slate-50 hover:text-slate-900"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                 title="Copy full transcript"
               >
                 {copied ? (
@@ -298,7 +298,7 @@ export default function MeetingTranscript({
                     Copy
                   </>
                 )}
-              </button> */}
+              </button>
             </div>
           </div>
 
@@ -339,6 +339,20 @@ export default function MeetingTranscript({
                 <Download className="h-3.5 w-3.5 text-slate-600" />
               )}
               <span>Download Transcript</span>
+            </button>
+            <button
+              type="button"
+              disabled={downloadingFormat !== null}
+              onClick={() => handleDownload("json")}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+              title="Download transcript as JSON"
+            >
+              {downloadingFormat === "json" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-slate-400" />
+              )}
+              <span>JSON</span>
             </button>
           </div>
         </div>

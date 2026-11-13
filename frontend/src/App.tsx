@@ -1,4 +1,4 @@
-﻿import {
+import {
   BrowserRouter,
   Navigate,
   Routes,
@@ -7,6 +7,8 @@
 } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+import Home from "./pages/Home";
+import ApplyProgram from "./pages/ApplyProgram";
 import Login from "./pages/Login";
 import AcceptInvite from "./pages/AcceptInvite";
 import ChangePassword from "./pages/ChangePassword";
@@ -24,10 +26,20 @@ function DashboardRedirect() {
   return <Navigate to={getDashboardPath(user)} replace />;
 }
 
+function RootRoute() {
+  const token = sessionStorage.getItem("token");
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <Home />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<RootRoute />} />
+        <Route path="/apply" element={<ApplyProgram />} />
         <Route path="/login" element={<Login />} />
         <Route path="/set-password" element={<AcceptInvite />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -74,7 +86,7 @@ export default function App() {
           <Route path="/dashboard/customer" element={<CustomerDashboard />} />
         </Route>
         <Route element={<ProtectedRoute key="default" />}>
-          <Route path="/" element={<DashboardRedirect />} />
+          <Route path="/dashboard" element={<DashboardRedirect />} />
           <Route
             path="/unauthorized"
             element={

@@ -1,5 +1,5 @@
-﻿import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api, getApiError } from "../services/api";
 import { getDashboardPath, saveSession } from "../services/auth";
 import type { AuthResponse } from "../types/auth";
@@ -59,6 +59,15 @@ export default function Login() {
         {submitting ? "Signing in..." : "Login"}
       </button>
       {error && <p role="alert">{error}</p>}
+      <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 text-center text-xs">
+        <span className="text-slate-500">New venture or founder?</span>
+        <Link
+          to="/apply"
+          className="font-semibold text-indigo-600 hover:text-indigo-800"
+        >
+          Apply to Program &rarr;
+        </Link>
+      </div>
     </form>
   );
 }
