@@ -6,9 +6,14 @@ import {
   submitCompany,
   listSubmissions,
   submitFeedback,
+  applyToProgram,
 } from "../controllers/company-submission.controller.js";
 
 const router = Router();
+
+// Public program application endpoint
+router.post("/apply", applyToProgram);
+
 router.use(authenticate);
 router.get("/mine", authorize("customer"), getMySubmission);
 router.post("/", authorize("customer"), submitCompany);
