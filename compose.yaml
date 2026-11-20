@@ -1,0 +1,75 @@
+name: rolebridge-meet
+
+services:
+  backend:
+    image: "${ECR_REGISTRY:-local}/rolebridge-meet-backend:${IMAGE_TAG:-local}"
+
+    build:
+      context: ./backend
+
+    restart: unless-stopped
+
+    init: true
+
+    env_file:
+      - "${BACKEND_ENV_FILE:-./backend/.env}"
+
+    environment:
+      NODE_ENV: production
+      PORT: "5001"
+      CLIENT_URL: "${CLIENT_URL:-http://localhost}"
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5001/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    image: "${ECR_REGISTRY:-local}/rolebridge-meet-frontend:${IMAGE_TAG:-local}"
+
+    build:
+      context: ./frontend
+      args:
+        # Browser requests must go through Nginx, not the host's development API.
+        VITE_API_URL: /api
+
+    restart: unless-stopped
+
+    ports:
+      - "${HTTP_PORT:-80}:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+        restart: true
+
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1/
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
